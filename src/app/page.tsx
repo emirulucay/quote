@@ -90,7 +90,16 @@ export default function Home() {
     const html2canvas = (await import("html2canvas")).default;
     const { jsPDF } = await import("jspdf");
 
-    const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+    const canvas = await html2canvas(element, { 
+      scale: 2, 
+      useCORS: true,
+      onclone: (clonedDoc) => {
+        const pdfContainer = clonedDoc.querySelector('.pdf-container');
+        if (pdfContainer) {
+          pdfContainer.classList.add('pdf-export');
+        }
+      }
+    });
     const imgData = canvas.toDataURL("image/jpeg", 0.98);
 
     const pdf = new jsPDF({
@@ -111,7 +120,11 @@ export default function Home() {
     pdf.save(fileName);
 
     setTimeout(() => {
-      setShowSupportModal(true);
+      const hasSeen = sessionStorage.getItem("hasSeenSupportModal");
+      if (!hasSeen) {
+        setShowSupportModal(true);
+        sessionStorage.setItem("hasSeenSupportModal", "true");
+      }
     }, 1500);
   };
 
@@ -413,7 +426,7 @@ export default function Home() {
             {/* A4 Paper */}
             <div
               ref={printRef}
-              className="bg-white w-full max-w-[794px] shrink-0 overflow-hidden shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] p-16 flex flex-col justify-start"
+              className="pdf-container bg-white w-full max-w-[794px] shrink-0 overflow-hidden shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] p-16 flex flex-col justify-start"
               style={{ aspectRatio: "1/1.414" }}
             >
               {/* Centered Title */}
@@ -430,31 +443,38 @@ export default function Home() {
 
               {/* Table */}
               <div className="flex-1">
-                <div className="grid grid-cols-12 gap-4 border-b-2 border-primary pb-3 mb-4 text-sm font-bold uppercase text-primary">
-                  <div className="col-span-6">Hizmet</div>
-                  <div className="col-span-2 text-center">Miktar</div>
-                  <div className="col-span-2 text-right">Fiyat</div>
-                  <div className="col-span-2 text-right">Toplam</div>
-                </div>
-
-                {lineItems.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-muted-foreground mb-4">
-                    Henüz hizmet eklenmedi.
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-4 mb-8">
-                    {lineItems.map((item) => (
-                      <div key={item.id} className="grid grid-cols-12 gap-4 text-sm items-center border-b border-border pb-4">
-                        <div className="col-span-6 font-medium text-sm truncate pr-2" title={item.name || "İsimsiz Hizmet"}>{item.name || "İsimsiz Hizmet"}</div>
-                        <div className="col-span-2 text-center font-mono">{item.quantity}</div>
-                        <div className="col-span-2 text-right font-mono">{formatCurrency(Number(item.price) || 0)}</div>
-                        <div className="col-span-2 text-right font-mono font-bold text-primary">
+                <table className="w-full text-sm mt-2">
+                <thead>
+                  <tr className="border-b-2 border-primary text-primary font-bold uppercase">
+                    <th className="py-3 text-left w-1/2 font-bold">Hizmet</th>
+                    <th className="py-3 text-center w-1/6 font-bold">Miktar</th>
+                    <th className="py-3 text-right w-1/6 font-bold">Fiyat</th>
+                    <th className="py-3 text-right w-1/6 font-bold">Toplam</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                        Henüz hizmet eklenmedi.
+                      </td>
+                    </tr>
+                  ) : (
+                    lineItems.map((item) => (
+                      <tr key={item.id} className="border-b border-border">
+                        <td className="py-4 font-medium break-words pr-2 align-middle" title={item.name || "İsimsiz Hizmet"}>
+                          {item.name || "İsimsiz Hizmet"}
+                        </td>
+                        <td className="py-4 text-center font-mono align-middle">{item.quantity}</td>
+                        <td className="py-4 text-right font-mono align-middle">{formatCurrency(Number(item.price) || 0)}</td>
+                        <td className="py-4 text-right font-mono font-bold text-primary align-middle">
                           {formatCurrency((Number(item.quantity) || 0) * (Number(item.price) || 0))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
 
                 <div className="flex justify-end mt-8">
                   <div className="w-1/2 flex flex-col gap-2">
