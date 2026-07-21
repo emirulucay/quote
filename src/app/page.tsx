@@ -91,8 +91,8 @@ export default function Home() {
     const html2canvas = (await import("html2canvas")).default;
     const { jsPDF } = await import("jspdf");
 
-    const canvas = await html2canvas(element, { 
-      scale: 2, 
+    const canvas = await html2canvas(element, {
+      scale: 2,
       useCORS: true,
       onclone: (clonedDoc) => {
         const pdfContainer = clonedDoc.querySelector('.pdf-container');
@@ -114,10 +114,10 @@ export default function Home() {
 
     // Zorla tek sayfaya sığdırıyoruz
     pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-    
+
     const clientSlug = createSlug(invoiceData.clientName);
     const fileName = clientSlug ? `teklif-${clientSlug}.pdf` : `teklif.pdf`;
-    
+
     pdf.save(fileName);
 
     setTimeout(() => {
@@ -133,13 +133,13 @@ export default function Home() {
     const profileName = (document.getElementById("new-profile-name") as HTMLInputElement).value;
     const companyName = (document.getElementById("new-company-name") as HTMLInputElement).value;
     const contactInfo = (document.getElementById("new-contact-info") as HTMLTextAreaElement).value;
-    
+
     if (companyName) {
-      saveAsNewProfile({ 
+      saveAsNewProfile({
         profileName: profileName || companyName,
-        companyName, 
-        contactInfo, 
-        logoBase64: DEFAULT_COMPANY_LOGO 
+        companyName,
+        contactInfo,
+        logoBase64: DEFAULT_COMPANY_LOGO
       });
       setShowProfileModal(false);
     } else {
@@ -165,7 +165,7 @@ export default function Home() {
         <div className="w-full max-w-md bg-surface border border-border rounded-xl shadow-2xl p-8 flex flex-col gap-6">
           <div className="text-center flex flex-col items-center">
             <div className="flex items-center justify-center mb-6">
-              <Image src="/quote.svg" alt="Quote Logo" width={100} height={48} className="h-12 w-auto object-contain" priority />
+              <Image src="/QUOTE.svg" alt="Quote Logo" width={100} height={48} className="h-12 w-auto object-contain" priority />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-primary">Hoş Geldiniz</h1>
             <p className="text-sm text-muted-foreground mt-2">
@@ -199,18 +199,18 @@ export default function Home() {
 
   return (
     <div className="h-screen w-full flex flex-col lg:flex-row overflow-hidden bg-background relative">
-      
+
       {/* Profile Modal (Used when adding subsequent profiles) */}
       {showProfileModal && (
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
           <div className="bg-surface p-6 rounded-lg shadow-2xl border border-border w-full max-w-[400px] flex flex-col gap-6 font-plex relative">
-            <button 
+            <button
               onClick={() => setShowProfileModal(false)}
               className="absolute top-4 right-4 text-muted-foreground hover:text-primary"
             >
               <X className="w-5 h-5" />
             </button>
-            
+
             <div>
               <h3 className="font-bold text-xl text-primary">Yeni Profil Oluştur</h3>
             </div>
@@ -245,180 +245,180 @@ export default function Home() {
           {/* Left Panel */}
           <div className="w-full lg:w-[450px] xl:w-[500px] h-full border-r border-border bg-surface shrink-0 flex flex-col relative z-10">
             <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-8">
-            
-            {/* Profile Switcher & Logo */}
-            <section className="flex flex-col gap-4">
-              <h2 className="text-xl font-bold">Profil</h2>
-              <div className="flex gap-2 items-center">
-                <Select value={activeProfileId} onValueChange={setActiveProfileId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Profil Seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {profiles.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.profileName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" onClick={() => setShowProfileModal(true)}>
-                  Yeni Ekle
-                </Button>
-              </div>
-              <div className="flex items-center gap-4 mt-2 p-3 border border-border rounded-md bg-background">
-                {activeProfile.logoBase64 ? (
-                  <Image src={activeProfile.logoBase64} alt="Logo" width={48} height={48} className="w-12 h-12 object-contain bg-white rounded border border-border" />
-                ) : (
-                  <div className="w-12 h-12 flex items-center justify-center bg-muted rounded border border-dashed border-border text-[10px] leading-tight text-center text-muted-foreground p-1">Logo Yok</div>
-                )}
-                <div className="flex-1 flex flex-col">
-                  <span className="text-sm font-semibold">{activeProfile.companyName}</span>
-                  <Label className="text-xs text-accent hover:text-accent-hover cursor-pointer mt-1 inline-flex items-center gap-1 w-fit">
-                    <Upload className="w-3 h-3" /> Logoyu Değiştir
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                    />
-                  </Label>
-                </div>
-              </div>
-            </section>
 
-            {/* Invoice Details */}
-            <section className="flex flex-col gap-4">
-              <h2 className="text-xl font-bold">Fatura Detayları</h2>
-              <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label>Tarih</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !invoiceData.date && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {invoiceData.date ? invoiceData.date : <span>Tarih Seçin</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={parseTrDate(invoiceData.date)}
-                          onSelect={(date) => {
-                            if (date) {
-                              setInvoiceData({ ...invoiceData, date: format(date, "dd.MM.yyyy") })
-                            }
-                          }}
-                          initialFocus
-                          locale={tr}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>KDV Oranı</Label>
-                    <Select
-                      value={String(invoiceData.kdvRate || 0)}
-                      onValueChange={(val) => setInvoiceData({ ...invoiceData, kdvRate: Number(val) })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="KDV" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">KDV Yok (%0)</SelectItem>
-                        <SelectItem value="10">%10 KDV</SelectItem>
-                        <SelectItem value="20">%20 KDV</SelectItem>
-                      </SelectContent>
-                    </Select>
+              {/* Profile Switcher & Logo */}
+              <section className="flex flex-col gap-4">
+                <h2 className="text-xl font-bold">Profil</h2>
+                <div className="flex gap-2 items-center">
+                  <Select value={activeProfileId} onValueChange={setActiveProfileId}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Profil Seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {profiles.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.profileName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" onClick={() => setShowProfileModal(true)}>
+                    Yeni Ekle
+                  </Button>
+                </div>
+                <div className="flex items-center gap-4 mt-2 p-3 border border-border rounded-md bg-background">
+                  {activeProfile.logoBase64 ? (
+                    <Image src={activeProfile.logoBase64} alt="Logo" width={48} height={48} className="w-12 h-12 object-contain bg-white rounded border border-border" />
+                  ) : (
+                    <div className="w-12 h-12 flex items-center justify-center bg-muted rounded border border-dashed border-border text-[10px] leading-tight text-center text-muted-foreground p-1">Logo Yok</div>
+                  )}
+                  <div className="flex-1 flex flex-col">
+                    <span className="text-sm font-semibold">{activeProfile.companyName}</span>
+                    <Label className="text-xs text-accent hover:text-accent-hover cursor-pointer mt-1 inline-flex items-center gap-1 w-fit">
+                      <Upload className="w-3 h-3" /> Logoyu Değiştir
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                    </Label>
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="clientName">Müşteri Adı</Label>
-                  <Input
-                    id="clientName"
-                    value={invoiceData.clientName}
-                    onChange={(e) => setInvoiceData({ ...invoiceData, clientName: e.target.value })}
-                  />
-                </div>
-              </div>
-            </section>
+              </section>
 
-            {/* Line Items */}
-            <section className="flex flex-col gap-4">
-              <h2 className="text-xl font-bold">Hizmetler</h2>
-              <div className="flex flex-col gap-2">
-                <AnimatePresence>
-                  {lineItems.map((item, idx) => (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center gap-2"
-                    >
-                      <div className="flex-1">
-                        <Input
-                          id={`service-name-${item.id}`}
-                          placeholder="Hizmet Adı"
-                          value={item.name}
-                          maxLength={65}
-                          onChange={(e) => updateLineItem(item.id, { name: e.target.value })}
-                        />
-                      </div>
-                      <div className="w-20">
-                        <Input
-                          type="number"
-                          min="1"
-                          placeholder="Adet"
-                          value={item.quantity}
-                          onChange={(e) => updateLineItem(item.id, { quantity: e.target.value === "" ? "" : Number(e.target.value) })}
-                        />
-                      </div>
-                      <div className="w-32">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="Fiyat"
-                          value={item.price}
-                          onChange={(e) => updateLineItem(item.id, { price: e.target.value === "" ? "" : Number(e.target.value) })}
-                        />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-danger hover:bg-danger/10 shrink-0"
-                        onClick={() => removeLineItem(item.id)}
+              {/* Invoice Details */}
+              <section className="flex flex-col gap-4">
+                <h2 className="text-xl font-bold">Fatura Detayları</h2>
+                <div className="grid gap-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Tarih</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !invoiceData.date && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {invoiceData.date ? invoiceData.date : <span>Tarih Seçin</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={parseTrDate(invoiceData.date)}
+                            onSelect={(date) => {
+                              if (date) {
+                                setInvoiceData({ ...invoiceData, date: format(date, "dd.MM.yyyy") })
+                              }
+                            }}
+                            initialFocus
+                            locale={tr}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>KDV Oranı</Label>
+                      <Select
+                        value={String(invoiceData.kdvRate || 0)}
+                        onValueChange={(val) => setInvoiceData({ ...invoiceData, kdvRate: Number(val) })}
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                <Button 
-                  variant="dashed" 
-                  className="mt-2 w-full" 
-                  onClick={() => {
-                    addLineItem();
-                    setTimeout(() => {
-                      const inputs = document.querySelectorAll<HTMLInputElement>('input[id^="service-name-"]');
-                      if (inputs.length > 0) {
-                        inputs[inputs.length - 1].focus();
-                      }
-                    }, 50);
-                  }}
-                  disabled={lineItems.length >= 7}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  {lineItems.length >= 7 ? "Maksimum Hizmet Sınırı (7)" : "Hizmet Ekle"}
-                </Button>
-              </div>
-            </section>
+                        <SelectTrigger>
+                          <SelectValue placeholder="KDV" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">KDV Yok (%0)</SelectItem>
+                          <SelectItem value="10">%10 KDV</SelectItem>
+                          <SelectItem value="20">%20 KDV</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="clientName">Müşteri Adı</Label>
+                    <Input
+                      id="clientName"
+                      value={invoiceData.clientName}
+                      onChange={(e) => setInvoiceData({ ...invoiceData, clientName: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Line Items */}
+              <section className="flex flex-col gap-4">
+                <h2 className="text-xl font-bold">Hizmetler</h2>
+                <div className="flex flex-col gap-2">
+                  <AnimatePresence>
+                    {lineItems.map((item, idx) => (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex items-center gap-2"
+                      >
+                        <div className="flex-1">
+                          <Input
+                            id={`service-name-${item.id}`}
+                            placeholder="Hizmet Adı"
+                            value={item.name}
+                            maxLength={65}
+                            onChange={(e) => updateLineItem(item.id, { name: e.target.value })}
+                          />
+                        </div>
+                        <div className="w-20">
+                          <Input
+                            type="number"
+                            min="1"
+                            placeholder="Adet"
+                            value={item.quantity}
+                            onChange={(e) => updateLineItem(item.id, { quantity: e.target.value === "" ? "" : Number(e.target.value) })}
+                          />
+                        </div>
+                        <div className="w-32">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Fiyat"
+                            value={item.price}
+                            onChange={(e) => updateLineItem(item.id, { price: e.target.value === "" ? "" : Number(e.target.value) })}
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-danger hover:bg-danger/10 shrink-0"
+                          onClick={() => removeLineItem(item.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  <Button
+                    variant="dashed"
+                    className="mt-2 w-full"
+                    onClick={() => {
+                      addLineItem();
+                      setTimeout(() => {
+                        const inputs = document.querySelectorAll<HTMLInputElement>('input[id^="service-name-"]');
+                        if (inputs.length > 0) {
+                          inputs[inputs.length - 1].focus();
+                        }
+                      }, 50);
+                    }}
+                    disabled={lineItems.length >= 7}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {lineItems.length >= 7 ? "Maksimum Hizmet Sınırı (7)" : "Hizmet Ekle"}
+                  </Button>
+                </div>
+              </section>
 
             </div>
             {/* Action Buttons */}
@@ -453,37 +453,37 @@ export default function Home() {
               {/* Table */}
               <div className="flex-1">
                 <table className="w-full text-sm mt-2">
-                <thead>
-                  <tr className="border-b-2 border-primary text-primary font-bold uppercase">
-                    <th className="py-3 text-left w-1/2 font-bold">Hizmet</th>
-                    <th className="py-3 text-center w-1/6 font-bold">Miktar</th>
-                    <th className="py-3 text-right w-1/6 font-bold">Fiyat</th>
-                    <th className="py-3 text-right w-1/6 font-bold">Toplam</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lineItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-muted-foreground">
-                        Henüz hizmet eklenmedi.
-                      </td>
+                  <thead>
+                    <tr className="border-b-2 border-primary text-primary font-bold uppercase">
+                      <th className="py-3 text-left w-1/2 font-bold">Hizmet</th>
+                      <th className="py-3 text-center w-1/6 font-bold">Miktar</th>
+                      <th className="py-3 text-right w-1/6 font-bold">Fiyat</th>
+                      <th className="py-3 text-right w-1/6 font-bold">Toplam</th>
                     </tr>
-                  ) : (
-                    lineItems.map((item) => (
-                      <tr key={item.id} className="border-b border-border">
-                        <td className="py-4 font-medium break-words pr-2 align-middle" title={item.name || "İsimsiz Hizmet"}>
-                          {item.name || "İsimsiz Hizmet"}
-                        </td>
-                        <td className="py-4 text-center font-mono align-middle">{item.quantity}</td>
-                        <td className="py-4 text-right font-mono align-middle">{formatCurrency(Number(item.price) || 0)}</td>
-                        <td className="py-4 text-right font-mono font-bold text-primary align-middle">
-                          {formatCurrency((Number(item.quantity) || 0) * (Number(item.price) || 0))}
+                  </thead>
+                  <tbody>
+                    {lineItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                          Henüz hizmet eklenmedi.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      lineItems.map((item) => (
+                        <tr key={item.id} className="border-b border-border">
+                          <td className="py-4 font-medium break-words pr-2 align-middle" title={item.name || "İsimsiz Hizmet"}>
+                            {item.name || "İsimsiz Hizmet"}
+                          </td>
+                          <td className="py-4 text-center font-mono align-middle">{item.quantity}</td>
+                          <td className="py-4 text-right font-mono align-middle">{formatCurrency(Number(item.price) || 0)}</td>
+                          <td className="py-4 text-right font-mono font-bold text-primary align-middle">
+                            {formatCurrency((Number(item.quantity) || 0) * (Number(item.price) || 0))}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
 
                 <div className="flex justify-end mt-8">
                   <div className="w-1/2 flex flex-col gap-2">
@@ -537,16 +537,16 @@ export default function Home() {
             >
               <X className="w-5 h-5" />
             </Button>
-            
+
             <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-6">
               <Heart className="w-8 h-8 fill-primary" />
             </div>
-            
+
             <h2 className="text-2xl font-bold mb-2">Tebrikler!</h2>
             <p className="text-muted-foreground mb-8 leading-relaxed">
               Teklif dosyanız başarıyla indirildi. Eğer bu ücretsiz aracı faydalı bulduysanız, geliştiriciye ufak bir destek olmak ister misiniz?
             </p>
-            
+
             <Button
               onClick={() => window.open("https://buymeacoffee.com/emirulucay", "_blank")}
               className="w-full py-6 text-base font-bold bg-[#FFDD00] hover:bg-[#FFDD00]/90 text-black shadow-md cursor-pointer mb-3"
@@ -554,12 +554,12 @@ export default function Home() {
               <Coffee className="w-5 h-5 mr-2" />
               Geliştiriciye Kahve Ismarla
             </Button>
-            <Button 
-              onClick={() => window.open('https://github.com/emirulucay/recete-pdf', '_blank')} 
+            <Button
+              onClick={() => window.open('https://github.com/emirulucay/recete-pdf', '_blank')}
               className="w-full py-6 text-base font-bold bg-[#24292e] hover:bg-[#24292e]/90 text-white shadow-md cursor-pointer mb-1 border-none"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" className="w-5 h-5 mr-2" fill="currentColor">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
               </svg>
               GitHub'da Yıldızla
             </Button>
