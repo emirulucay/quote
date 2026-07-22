@@ -67,6 +67,10 @@ export default function Home() {
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newContactInfo, setNewContactInfo] = useState("");
 
+  const [showTaxModal, setShowTaxModal] = useState(false);
+  const [newTaxName, setNewTaxName] = useState("");
+  const [newTaxRate, setNewTaxRate] = useState("");
+
   if (!state.isLoaded) return null;
 
   const {
@@ -86,6 +90,9 @@ export default function Home() {
     setLanguage,
     currency,
     setCurrency,
+    customTaxes,
+    allTaxes,
+    addCustomTax,
     t,
   } = state;
 
@@ -156,6 +163,26 @@ export default function Home() {
       setShowProfileModal(false);
     } else {
       toast.error(language === "tr" ? "Şirket/Ad kısmı zorunludur" : "Company / Your Name is required");
+    }
+  };
+
+  const handleSaveCustomTax = () => {
+    const name = newTaxName.trim() || "Vergi";
+    const rate = Number(newTaxRate);
+    if (!isNaN(rate) && rate >= 0) {
+      const created = addCustomTax(name, rate);
+      setInvoiceData({
+        ...invoiceData,
+        kdvRate: created.rate,
+        taxName: created.name,
+        taxId: created.id,
+      });
+      setNewTaxName("");
+      setNewTaxRate("");
+      setShowTaxModal(false);
+      toast.success(language === "tr" ? "Özel vergi eklendi" : "Custom tax added");
+    } else {
+      toast.error(language === "tr" ? "Geçerli bir vergi oranı girin" : "Enter a valid tax rate");
     }
   };
 
@@ -312,7 +339,7 @@ export default function Home() {
                   placeholder={t.contactInfoPlaceholder}
                   value={newContactInfo}
                   onChange={(e) => setNewContactInfo(e.target.value)}
-                  className="flex min-h-[90px] w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                  className="flex min-h-22.5 w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                 />
               </div>
 
@@ -344,10 +371,72 @@ export default function Home() {
   return (
     <div className="h-screen w-full flex flex-col lg:flex-row overflow-hidden bg-background relative font-plex">
 
+      {/* Custom Tax Modal */}
+      {showTaxModal && (
+        <div className="fixed inset-0 z-100 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-surface p-6 rounded-lg shadow-2xl border border-border w-full max-w-95 flex flex-col gap-5 font-plex relative">
+            <button
+              onClick={() => {
+                setNewTaxName("");
+                setNewTaxRate("");
+                setShowTaxModal(false);
+              }}
+              className="absolute top-4 right-4 text-muted-foreground hover:text-primary cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div>
+              <h3 className="font-bold text-xl text-primary">{t.customTaxModalTitle}</h3>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="custom-tax-name">{t.customTaxNameLabel}</Label>
+              <Input
+                id="custom-tax-name"
+                placeholder={t.customTaxNamePlaceholder}
+                value={newTaxName}
+                onChange={(e) => setNewTaxName(e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="custom-tax-rate">{t.customTaxRateLabel}</Label>
+              <Input
+                id="custom-tax-rate"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder={t.customTaxRatePlaceholder}
+                value={newTaxRate}
+                onChange={(e) => setNewTaxRate(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 mt-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setNewTaxName("");
+                  setNewTaxRate("");
+                  setShowTaxModal(false);
+                }}
+                className="cursor-pointer"
+              >
+                {t.cancelButton}
+              </Button>
+              <Button onClick={handleSaveCustomTax} className="cursor-pointer">
+                {t.addTaxButton}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Profile Modal (Used when adding subsequent profiles) */}
       {showProfileModal && (
-        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-surface p-6 rounded-lg shadow-2xl border border-border w-full max-w-[440px] flex flex-col gap-5 font-plex relative">
+        <div className="fixed inset-0 z-100 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-surface p-6 rounded-lg shadow-2xl border border-border w-full max-w-110 flex flex-col gap-5 font-plex relative">
             <button
               onClick={() => {
                 setNewCompanyName("");
@@ -379,7 +468,7 @@ export default function Home() {
                 placeholder={t.contactInfoPlaceholder}
                 value={newContactInfo}
                 onChange={(e) => setNewContactInfo(e.target.value)}
-                className="flex min-h-[90px] w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                className="flex min-h-22.5 w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
               />
             </div>
 
@@ -408,7 +497,7 @@ export default function Home() {
       {activeProfile && (
         <>
           {/* Left Panel */}
-          <div className="w-full lg:w-[450px] xl:w-[500px] h-full border-r border-border bg-surface shrink-0 flex flex-col relative z-10">
+          <div className="w-full lg:w-112.5 xl:w-125 h-full border-r border-border bg-surface shrink-0 flex flex-col relative z-10">
             <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-8">
 
               {/* Profile Switcher & Logo */}
@@ -516,16 +605,37 @@ export default function Home() {
                     <div className="grid gap-2">
                       <Label>{t.kdvLabel}</Label>
                       <Select
-                        value={String(invoiceData.kdvRate || 0)}
-                        onValueChange={(val) => setInvoiceData({ ...invoiceData, kdvRate: Number(val) })}
+                        value={invoiceData.taxId || allTaxes.find((tax) => tax.rate === invoiceData.kdvRate)?.id || "tax-0"}
+                        onValueChange={(val) => {
+                          if (val === "add-custom-tax") {
+                            setShowTaxModal(true);
+                          } else {
+                            const selected = allTaxes.find((tax) => tax.id === val);
+                            if (selected) {
+                              setInvoiceData({
+                                ...invoiceData,
+                                kdvRate: selected.rate,
+                                taxName: selected.name,
+                                taxId: selected.id,
+                              });
+                            }
+                          }
+                        }}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="cursor-pointer">
                           <SelectValue placeholder={t.kdvLabel} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="0">{t.kdvNone}</SelectItem>
-                          <SelectItem value="10">{t.kdv10}</SelectItem>
-                          <SelectItem value="20">{t.kdv20}</SelectItem>
+                          {allTaxes.map((tax) => (
+                            <SelectItem key={tax.id} value={tax.id}>
+                              {tax.rate === 0
+                                ? t.kdvNone
+                                : `${tax.name} (%${tax.rate})`}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="add-custom-tax" className="font-semibold text-accent cursor-pointer border-t border-border mt-1 pt-1">
+                            {t.addCustomTaxOption}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -537,6 +647,15 @@ export default function Home() {
                       value={invoiceData.clientName}
                       onChange={(e) => setInvoiceData({ ...invoiceData, clientName: e.target.value })}
                       placeholder={t.clientNamePlaceholder}
+                      onFocus={() => {
+                        if (
+                          invoiceData.clientName === "Muhammet Bilal Apaydın" ||
+                          invoiceData.clientName === "Müşteri Adı" ||
+                          invoiceData.clientName === "Client Name"
+                        ) {
+                          setInvoiceData({ ...invoiceData, clientName: "" });
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -629,7 +748,7 @@ export default function Home() {
             {/* A4 Paper */}
             <div
               ref={printRef}
-              className="pdf-container bg-white w-full max-w-[794px] shrink-0 overflow-hidden shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] p-16 flex flex-col justify-start"
+              className="pdf-container bg-white w-full max-w-198.5 shrink-0 overflow-hidden shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] p-16 flex flex-col justify-start"
               style={{ aspectRatio: "1/1.414" }}
             >
               {/* Centered Title */}
@@ -665,7 +784,7 @@ export default function Home() {
                     ) : (
                       lineItems.map((item) => (
                         <tr key={item.id} className="border-b border-border">
-                          <td className="py-4 font-medium break-words pr-2 align-middle" title={item.name || t.unnamedService}>
+                          <td className="py-4 font-medium wrap-break-word pr-2 align-middle" title={item.name || t.unnamedService}>
                             {item.name || t.unnamedService}
                           </td>
                           <td className="py-4 text-center font-mono align-middle">{item.quantity}</td>
@@ -689,7 +808,7 @@ export default function Home() {
                     )}
                     {invoiceData.kdvRate > 0 && (
                       <div className="flex justify-between py-2 text-muted-foreground">
-                        <span className="font-medium text-sm">{t.kdvTaxLabel} (%{invoiceData.kdvRate})</span>
+                        <span className="font-medium text-sm">{invoiceData.taxName || "KDV"} (%{invoiceData.kdvRate})</span>
                         <span className="font-mono text-sm">{formatCurrency(kdvAmount, currency, language)}</span>
                       </div>
                     )}
@@ -704,7 +823,7 @@ export default function Home() {
               {/* Footer (Logo & Freelancer Info) */}
               <div className="mt-auto pt-12 flex flex-col items-center text-center gap-4">
                 {activeProfile.logoBase64 && (
-                  <Image src={activeProfile.logoBase64} alt="Company Logo" width={200} height={64} className="h-16 w-auto object-contain max-w-[200px]" />
+                  <Image src={activeProfile.logoBase64} alt="Company Logo" width={200} height={64} className="h-16 w-auto object-contain max-w-50" />
                 )}
                 <div className="flex flex-col">
                   <p className="font-bold text-lg">{activeProfile.companyName}</p>
@@ -749,7 +868,7 @@ export default function Home() {
               {t.buyCoffee}
             </Button>
             <Button
-              onClick={() => window.open('https://github.com/emirulucay/recete-pdf', '_blank')}
+              onClick={() => window.open('https://github.com/emirulucay/quote', '_blank')}
               className="w-full py-6 text-base font-bold bg-[#24292e] hover:bg-[#24292e]/90 text-white shadow-md cursor-pointer mb-1 border-none"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" className="w-5 h-5 mr-2" fill="currentColor">

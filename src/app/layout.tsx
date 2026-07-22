@@ -22,16 +22,20 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://quote.emirulucay.com"),
-  title: "Quote by Emir Ulucay",
-  description: "Modern, hızlı ve profesyonel teklif & fatura oluşturma aracı. Emir Uluçay tarafından geliştirildi.",
+  title: "Quote – Minimal & Fast Invoice Generator",
+  description: "Create, customize, and export clean PDF quotes and invoices in seconds. Built by Emir Uluçay.",
   openGraph: {
-    title: "Quote by Emir Ulucay",
-    description: "Modern, hızlı ve profesyonel teklif & fatura oluşturma aracı.",
+    title: "Quote – Minimal & Fast Invoice Generator",
+    description: "Create, customize, and export clean PDF quotes and invoices in seconds. Built by Emir Uluçay.",
+    url: "https://quote.emirulucay.com",
+    siteName: "Quote",
+    locale: "en_US",
+    type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Quote by Emir Ulucay",
-    description: "Modern, hızlı ve profesyonel teklif & fatura oluşturma aracı.",
+    title: "Quote – Minimal & Fast Invoice Generator",
+    description: "Create, customize, and export clean PDF quotes and invoices in seconds. Built by Emir Uluçay.",
   },
   icons: {
     icon: [
@@ -51,7 +55,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr">
+    <html lang="en">
       <body
         className={`${plexSans.className} ${outfit.variable} ${plexSans.variable} ${jetbrainsMono.variable} antialiased`}
       >

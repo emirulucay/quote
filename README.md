@@ -27,8 +27,8 @@ Projeyi kendi bilgisayarınızda çalıştırmak için aşağıdaki adımları t
 
 1. Projeyi klonlayın:
    ```bash
-   git clone https://github.com/emirulucay/recete-pdf.git
-   cd recete-pdf
+   git clone https://github.com/emirulucay/quote.git
+   cd quote
    ```
 
 2. Gerekli paketleri `pnpm` (veya `npm`, `yarn`) ile yükleyin:

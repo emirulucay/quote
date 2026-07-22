@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
-import { Profile, LineItem, InvoiceData } from "../types";
+import { Profile, LineItem, InvoiceData, CustomTax } from "../types";
 import { Language, Currency, TRANSLATIONS } from "../lib/i18n";
 import { toast } from "sonner";
 
 export const DEFAULT_COMPANY_LOGO = "";
 export const DEFAULT_CLIENT_LOGO = "https://images.pexels.com/photos/19023561/pexels-photo-19023561.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
+
+export const DEFAULT_TAXES: CustomTax[] = [
+  { id: "tax-0", name: "KDV", rate: 0 },
+  { id: "tax-10", name: "KDV", rate: 10 },
+  { id: "tax-20", name: "KDV", rate: 20 },
+];
 
 const getInitialDate = () => {
   const d = new Date();
@@ -12,10 +18,12 @@ const getInitialDate = () => {
 };
 
 const emptyInvoiceData: InvoiceData = {
-  clientName: "Müşteri Adı",
+  clientName: "Muhammet Bilal Apaydın",
   date: getInitialDate(),
   notes: "Bizi tercih ettiğiniz için teşekkür ederiz.",
   kdvRate: 0,
+  taxName: "KDV",
+  taxId: "tax-0",
 };
 
 export function useInvoiceState() {
@@ -26,6 +34,7 @@ export function useInvoiceState() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [language, setLanguageState] = useState<Language>("tr");
   const [currency, setCurrencyState] = useState<Currency>("TRY");
+  const [customTaxes, setCustomTaxes] = useState<CustomTax[]>([]);
 
   useEffect(() => {
     // Load preferences
@@ -41,6 +50,19 @@ export function useInvoiceState() {
         }
       } catch (e) {
         console.error("Failed to parse preferences", e);
+      }
+    }
+
+    // Load custom taxes
+    const savedCustomTaxes = localStorage.getItem("quote-custom-taxes");
+    if (savedCustomTaxes) {
+      try {
+        const parsed = JSON.parse(savedCustomTaxes);
+        if (Array.isArray(parsed)) {
+          setCustomTaxes(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to parse custom taxes", e);
       }
     }
 
@@ -76,12 +98,28 @@ export function useInvoiceState() {
     }
   }, [language, currency, isLoaded]);
 
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem("quote-custom-taxes", JSON.stringify(customTaxes));
+    }
+  }, [customTaxes, isLoaded]);
+
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
   };
 
   const setCurrency = (curr: Currency) => {
     setCurrencyState(curr);
+  };
+
+  const addCustomTax = (name: string, rate: number) => {
+    const newTax: CustomTax = {
+      id: `custom-${crypto.randomUUID()}`,
+      name,
+      rate,
+    };
+    setCustomTaxes((prev) => [...prev, newTax]);
+    return newTax;
   };
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId) || profiles[0] || null;
@@ -121,6 +159,9 @@ export function useInvoiceState() {
     setLineItems((prev) => prev.filter((item) => item.id !== id));
   };
 
+  // Combine default + custom taxes
+  const allTaxes: CustomTax[] = [...DEFAULT_TAXES, ...customTaxes];
+
   return {
     isLoaded,
     profiles,
@@ -139,6 +180,9 @@ export function useInvoiceState() {
     setLanguage,
     currency,
     setCurrency,
+    customTaxes,
+    allTaxes,
+    addCustomTax,
     t,
   };
 }

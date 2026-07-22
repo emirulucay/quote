@@ -2,6 +2,12 @@ import { Language, Currency } from "../lib/i18n";
 
 export type { Language, Currency };
 
+export interface CustomTax {
+  id: string;
+  name: string;
+  rate: number;
+}
+
 export interface LineItem {
   id: string;
   name: string;
@@ -22,4 +28,6 @@ export interface InvoiceData {
   date: string;
   notes: string;
   kdvRate: number;
+  taxName?: string;
+  taxId?: string;
 }
