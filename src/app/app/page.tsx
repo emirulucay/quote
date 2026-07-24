@@ -741,7 +741,7 @@ export default function AppPage() {
 
           {/* Right Panel - Preview */}
           <div className="flex-1 h-full bg-[#ebe9e3] flex flex-col items-center px-6 pb-12 pt-6 overflow-y-auto relative lg:px-10">
-            <div className="pointer-events-none fixed bottom-5 right-5 z-30 flex items-center gap-2 rounded-full border border-white/70 bg-[#fbfaf7]/90 px-3.5 py-2 text-[10px] font-medium text-black/48 shadow-[0_8px_24px_rgba(20,21,18,0.12)] backdrop-blur-md">
+            <div className="pointer-events-none fixed bottom-5 right-5 z-30 hidden items-center gap-2 rounded-full border border-white/70 bg-[#fbfaf7]/90 px-3.5 py-2 text-[10px] font-medium text-black/48 shadow-[0_8px_24px_rgba(20,21,18,0.12)] backdrop-blur-md lg:flex">
               <span className="size-1.5 rounded-full bg-[#8ba000]" />
               {language === "tr" ? "Otomatik kaydedilir" : "Autosaved"}
             </div>
