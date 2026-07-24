@@ -128,6 +128,12 @@ export function useInvoiceState() {
     setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, ...data } : p)));
   };
 
+  const deleteProfile = (id: string) => {
+    const next = profiles.filter((profile) => profile.id !== id);
+    setProfiles(next);
+    if (activeProfileId === id) setActiveProfileId(next[0]?.id || "");
+  };
+
   const t = TRANSLATIONS[language] || TRANSLATIONS.tr;
 
   const saveAsNewProfile = (data: Partial<Profile>) => {
@@ -147,7 +153,7 @@ export function useInvoiceState() {
   const addLineItem = () => {
     setLineItems((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), name: "", quantity: 1, price: "" },
+      { id: crypto.randomUUID(), name: "", description: "", quantity: 1, price: "" },
     ]);
   };
 
@@ -169,6 +175,7 @@ export function useInvoiceState() {
     setActiveProfileId,
     activeProfile,
     updateProfile,
+    deleteProfile,
     saveAsNewProfile,
     invoiceData,
     setInvoiceData,

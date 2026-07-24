@@ -11,6 +11,7 @@ export interface CustomTax {
 export interface LineItem {
   id: string;
   name: string;
+  description?: string;
   quantity: number | string;
   price: number | string;
 }

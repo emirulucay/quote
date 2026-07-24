@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
-  CircleCheck,
   CloudOff,
   Coffee,
   FileDown,
@@ -104,27 +103,39 @@ export default function LandingPage() {
                   <div className="flex gap-1.5"><span className="size-2.5 rounded-full bg-white/20" /><span className="size-2.5 rounded-full bg-white/20" /><span className="size-2.5 rounded-full bg-white/20" /></div>
                   <span className="font-mono text-[9px] tracking-wide sm:text-[11px]">quote.emirulucay.com/app</span><span className="w-12" />
                 </div>
-                <div className="grid min-h-[520px] overflow-hidden rounded-[1.15rem] bg-[#eeece6] lg:grid-cols-[0.74fr_1.26fr]">
-                  <div className="border-b border-black/8 p-5 sm:p-8 lg:border-b-0 lg:border-r">
-                    <div className="flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/40">Quote details</p><span className="rounded-full bg-[#dff568] px-2.5 py-1 text-[10px] font-bold">LIVE</span></div>
-                    <div className="mt-7 space-y-5">
-                      {[['Client', 'Northstar Studio'], ['Project', 'Website design & development'], ['Valid until', '24 August 2026']].map(([label, value]) => <div key={label}><p className="mb-2 text-[11px] font-medium text-black/42">{label}</p><div className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm font-medium shadow-sm">{value}</div></div>)}
-                      <div className="grid grid-cols-2 gap-3"><div><p className="mb-2 text-[11px] font-medium text-black/42">Currency</p><div className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm font-medium">EUR · €</div></div><div><p className="mb-2 text-[11px] font-medium text-black/42">Tax</p><div className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm font-medium">VAT · 20%</div></div></div>
+                <div className="grid min-h-[560px] overflow-hidden rounded-[1.15rem] bg-[#ebe9e3] lg:grid-cols-[0.84fr_1.16fr]">
+                  <div className="flex flex-col border-b border-black/8 bg-[#fbfaf7] p-5 lg:border-b-0 lg:border-r sm:p-6">
+                    <div className="flex items-start justify-between border-b border-black/8 pb-4">
+                      <div><QuoteLogo className="h-4 w-auto" /><p className="mt-2 text-[7px] font-semibold tracking-[0.14em] text-black/32">NEW QUOTE</p></div>
+                      <div className="flex gap-1.5"><span className="rounded-full border border-black/8 bg-white px-2 py-1 text-[8px] font-medium">🇬🇧 EN</span><span className="rounded-full border border-black/8 bg-white px-2 py-1 text-[8px] font-medium">€ EUR</span></div>
                     </div>
-                    <div className="mt-7 flex items-center justify-center gap-2 rounded-xl bg-[#171815] py-3.5 text-xs font-semibold text-white"><FileDown className="size-4" /> Download PDF</div>
+                    <div className="mt-4 flex items-center justify-between rounded-lg border border-black/8 bg-white px-3 py-2 text-[9px] font-medium"><span>Emir Uluçay</span><span className="text-black/30">⌄</span></div>
+                    <div className="mt-5 flex items-center gap-2"><span className="flex size-5 items-center justify-center rounded-full bg-[#dff568] font-mono text-[7px] font-bold">01</span><p className="text-[10px] font-semibold">Invoice details</p></div>
+                    <div className="mt-3 space-y-2.5">
+                      <div><p className="mb-1 text-[7px] font-medium text-black/38">Client name</p><div className="rounded-lg border border-black/8 bg-white px-3 py-2 text-[9px] font-medium">Recete Studio</div></div>
+                      <div className="grid grid-cols-2 gap-2"><div><p className="mb-1 text-[7px] font-medium text-black/38">Date</p><div className="rounded-lg border border-black/8 bg-white px-3 py-2 text-[9px]">24.08.2026</div></div><div><p className="mb-1 text-[7px] font-medium text-black/38">Tax</p><div className="rounded-lg border border-black/8 bg-white px-3 py-2 text-[9px]">VAT · 20%</div></div></div>
+                    </div>
+                    <div className="mt-5 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex size-5 items-center justify-center rounded-full bg-[#dff568] font-mono text-[7px] font-bold">02</span><p className="text-[10px] font-semibold">Services</p></div><span className="text-[7px] text-black/32">1 / 7</span></div>
+                    <div className="mt-3 rounded-lg border border-black/8 bg-white p-2.5">
+                      <div className="grid grid-cols-[1fr_2.3rem_3.5rem] gap-1.5"><div className="rounded-md bg-[#f5f3ee] px-2 py-2 text-[8px] font-medium">Product strategy & UX</div><div className="rounded-md bg-[#f5f3ee] px-2 py-2 text-center text-[8px]">1</div><div className="rounded-md bg-[#f5f3ee] px-2 py-2 text-[8px]">€1,800</div></div>
+                      <p className="mt-1.5 px-1 text-[7px] text-black/35">+ Add a description (optional)</p>
+                    </div>
+                    <div className="mt-2 rounded-lg border border-dashed border-black/12 py-2 text-center text-[8px] font-medium">+ Add service</div>
+                    <div className="mt-auto flex items-center justify-center gap-2 rounded-full bg-[#171815] py-3 text-[9px] font-semibold text-white"><FileDown className="size-3" /> Download PDF <span className="text-white/35">· A4</span></div>
                   </div>
-                  <div className="flex items-center justify-center p-4 sm:p-9 lg:p-12">
-                    <div className="aspect-[1/1.414] w-full max-w-[500px] bg-white p-[7%] shadow-[0_20px_50px_rgba(20,21,18,0.14)]">
-                      <div className="flex items-start justify-between border-b-2 border-black pb-[7%]"><div><p className="text-[clamp(12px,2vw,22px)] font-semibold tracking-[-0.03em]">QUOTE</p><p className="mt-1 font-mono text-[7px] text-black/40 sm:text-[9px]">Q-2026-042</p></div><div className="text-right"><p className="text-[8px] font-semibold sm:text-xs">NOVA WORKS</p><p className="mt-1 text-[6px] text-black/40 sm:text-[9px]">design@novaworks.co</p></div></div>
-                      <div className="py-[8%]"><p className="text-[6px] font-semibold uppercase tracking-widest text-black/35 sm:text-[8px]">Prepared for</p><p className="mt-1 text-[10px] font-semibold sm:text-sm">Northstar Studio</p></div>
-                      <div className="grid grid-cols-[1fr_auto] border-b border-black pb-2 text-[6px] font-semibold uppercase tracking-wider sm:text-[8px]"><span>Service</span><span>Total</span></div>
-                      {[['Product strategy & UX', '€1,800'], ['Visual design system', '€2,400'], ['Frontend development', '€3,200']].map(([service, total]) => <div key={service} className="grid grid-cols-[1fr_auto] border-b border-black/8 py-[5%] text-[7px] sm:text-[10px]"><span>{service}</span><span className="font-mono font-medium">{total}</span></div>)}
-                      <div className="ml-auto mt-[7%] w-[58%] space-y-2 text-[7px] sm:text-[10px]"><div className="flex justify-between text-black/45"><span>Subtotal</span><span className="font-mono">€7,400</span></div><div className="flex justify-between text-black/45"><span>VAT 20%</span><span className="font-mono">€1,480</span></div><div className="flex justify-between border-t border-black pt-3 text-[10px] font-semibold sm:text-sm"><span>Total</span><span className="font-mono">€8,880</span></div></div>
+                  <div className="relative flex items-center justify-center p-4 sm:p-8 lg:p-10">
+                    <div className="aspect-[1/1.414] w-full max-w-[470px] bg-white p-[8%] shadow-[0_20px_50px_rgba(20,21,18,0.14)]">
+                      <div className="text-center"><p className="text-[clamp(11px,1.8vw,20px)] font-semibold tracking-[0.12em]">SERVICE SUMMARY</p><p className="mt-1 font-mono text-[7px] text-black/38 sm:text-[9px]">24.08.2026</p></div>
+                      <div className="py-[10%] text-center"><p className="text-[6px] font-semibold tracking-widest text-black/35 sm:text-[8px]">PREPARED FOR</p><p className="mt-1 text-[10px] font-semibold sm:text-sm">Recete Studio</p></div>
+                      <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b-2 border-black pb-2 text-[6px] font-semibold tracking-wider sm:text-[8px]"><span>SERVICE</span><span>QTY</span><span>TOTAL</span></div>
+                      {[['Product strategy & UX', '1', '€1,800'], ['Visual design system', '1', '€2,400'], ['Frontend development', '1', '€3,200']].map(([service, qty, total]) => <div key={service} className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-black/8 py-[5%] text-[7px] sm:text-[9px]"><span>{service}</span><span>{qty}</span><span className="tabular-nums font-medium">{total}</span></div>)}
+                      <div className="ml-auto mt-[7%] w-[58%] space-y-2 text-[7px] sm:text-[9px]"><div className="flex justify-between text-black/45"><span>Subtotal</span><span className="tabular-nums">€7,400</span></div><div className="flex justify-between text-black/45"><span>VAT 20%</span><span className="tabular-nums">€1,480</span></div><div className="flex justify-between border-t-2 border-black pt-3 text-[10px] font-semibold sm:text-xs"><span>Total</span><span className="tabular-nums">€8,880</span></div></div>
+                      <div className="mt-auto pt-[22%] text-center"><p className="text-[8px] font-semibold sm:text-[10px]">EMIR ULUÇAY</p><p className="mt-1 text-[6px] leading-3 text-black/38 sm:text-[8px]">hi@emirulucay.com<br />İzmir, Türkiye</p></div>
                     </div>
+                    <div className="absolute bottom-4 right-4 flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 px-2.5 py-1.5 text-[7px] text-black/45 shadow-lg backdrop-blur"><span className="size-1.5 rounded-full bg-[#8ba000]" />Autosaved</div>
                   </div>
                 </div>
               </div>
-              <div className="absolute -right-2 top-[28%] hidden rounded-2xl border border-black/8 bg-white p-4 shadow-xl sm:flex sm:items-center sm:gap-3 lg:-right-10"><div className="flex size-9 items-center justify-center rounded-full bg-[#dff568]"><CircleCheck className="size-4" /></div><div><p className="text-xs font-semibold">Ready to send</p><p className="mt-0.5 text-[10px] text-black/45">PDF exported successfully</p></div></div>
             </motion.div>
           </div>
         </section>

@@ -64,6 +64,7 @@ export const TRANSLATIONS = {
     // Line Items
     servicesTitle: "Hizmetler",
     serviceNamePlaceholder: "Hizmet Adı",
+    serviceDescriptionPlaceholder: "Açıklama ekle (isteğe bağlı)",
     quantityPlaceholder: "Adet",
     pricePlaceholder: "Fiyat",
     addServiceButton: "Hizmet Ekle",
@@ -147,6 +148,7 @@ export const TRANSLATIONS = {
     // Line Items
     servicesTitle: "Services",
     serviceNamePlaceholder: "Service Name",
+    serviceDescriptionPlaceholder: "Add a description (optional)",
     quantityPlaceholder: "Qty",
     pricePlaceholder: "Price",
     addServiceButton: "Add Service",
