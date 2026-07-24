@@ -81,7 +81,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/opengraph-image-v2.jpg",
+        url: "/opengraph-image.png",
         width: 1200,
         height: 630,
         alt: "Quote – Minimal & Fast Invoice Generator",
@@ -93,7 +93,7 @@ export const metadata: Metadata = {
     title: "Quote – Minimal & Fast Invoice Generator",
     description: "Create, customize, and export clean PDF quotes and invoices in seconds. Built by Emir Uluçay.",
     creator: "@emirulucay",
-    images: ["/opengraph-image-v2.jpg"],
+    images: ["/opengraph-image.png"],
   },
   icons: {
     icon: [
