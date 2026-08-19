@@ -15,7 +15,20 @@
   --font-geist: var(--font-geist), sans-serif;
   --font-plex: var(--font-plex), sans-serif;
   --font-mono: var(--font-mono), monospace;
+  --font-inter: var(--font-inter), sans-serif;
+  --font-jakarta: var(--font-jakarta), sans-serif;
+  --font-space: var(--font-space), sans-serif;
+  --font-playfair: var(--font-playfair), serif;
+  --font-lora: var(--font-lora), serif;
 }
+
+.font-pdf-plex { font-family: var(--font-plex), sans-serif; }
+.font-pdf-geist { font-family: var(--font-geist), sans-serif; }
+.font-pdf-inter { font-family: var(--font-inter), sans-serif; }
+.font-pdf-jakarta { font-family: var(--font-jakarta), sans-serif; }
+.font-pdf-space { font-family: var(--font-space), sans-serif; }
+.font-pdf-playfair { font-family: var(--font-playfair), serif; }
+.font-pdf-lora { font-family: var(--font-lora), serif; }
 
 @layer base {
   body {

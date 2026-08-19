@@ -45,6 +45,25 @@ export const TRANSLATIONS = {
     
     // Invoice Form
     invoiceDetailsTitle: "Fatura Detayları",
+    billingTypeLabel: "Teklif / Fatura Türü",
+    billingOneTime: "Tek Seferlik",
+    billingSubscription: "Abonelik",
+    billingCycleLabel: "Abonelik Periyodu",
+    cycleMonthly: "Aylık",
+    cycleYearly: "Yıllık",
+    cycleQuarterly: "3 Aylık",
+    cycleMonthlyBadge: "Aylık Abonelik",
+    cycleYearlyBadge: "Yıllık Abonelik",
+    cycleQuarterlyBadge: "3 Aylık Abonelik",
+    perMonth: "/ Ay",
+    perYear: "/ Yıl",
+    perQuarter: "/ Çeyrek",
+    periodStartLabel: "Başlangıç Tarihi",
+    periodEndLabel: "Bitiş Tarihi",
+    billingPeriodLabel: "Hizmet Dönemi",
+    autoRenewalLabel: "Otomatik Yenilenir",
+    subscriptionDocumentTitle: "ABONELİK & HİZMET TEKLİFİ",
+    subscriptionNoteTemplate: "Bu teklif belirtilen dönem için geçerli abonelik bedelini içermektedir. Dönem sonunda yenilenir.",
     dateLabel: "Tarih",
     selectDatePlaceholder: "Tarih Seçin",
     kdvLabel: "Vergi Oranı",
@@ -78,6 +97,13 @@ export const TRANSLATIONS = {
 
     // Invoice Preview & PDF
     documentTitle: "HİZMET ÖZETİ",
+    documentTitleLabel: "Belge Başlığı",
+    documentTitlePlaceholder: "Örn: HİZMET ÖZETİ, FİYAT TEKLİFİ",
+    presetTitleServiceSummary: "Hizmet Özeti",
+    presetTitleQuote: "Fiyat Teklifi",
+    presetTitleProforma: "Proforma Fatura",
+    presetTitleProposal: "Proje Teklifi",
+    presetTitleSubscription: "Abonelik Teklifi",
     clientHeader: "SAYIN",
     thService: "HİZMET",
     thQuantity: "MİKTAR",
@@ -96,9 +122,81 @@ export const TRANSLATIONS = {
     starGithub: "GitHub'da Yıldızla",
     maybeLater: "Belki daha sonra",
 
+    // Onboarding Layout Step & Layout Preferences
+    onboardingStepLayoutTitle: "Hizmetler Düzeni",
+    onboardingStepLayoutDesc: "Fatura düzenleme alanında hizmetlerin nasıl gösterileceğini seçin.",
+    layoutInlineTitle: "Alt Alta (Tek Sayfa)",
+    layoutInlineDesc: "Fatura detayları ve hizmetler tek sayfada alt alta sıralanır. Hızlı ve kesintisiz akış.",
+    layoutTabsTitle: "Ayrı Sekmeler",
+    layoutTabsDesc: "Fatura detayları ve hizmetler iki ayrı sekmede düzenlenir. Temiz ve odaklı çalışma alanı.",
+    
+    // Layout Selection Modal (Returning Users)
+    layoutModalTag: "DÜZEN SEÇİMİ",
+    layoutModalTitle: "Hizmetler Düzenini Seçin",
+    layoutModalDesc: "Teklif hazırlarken hizmetler bölümünü nasıl görüntülemek istersiniz? Bu tercihi daha sonra istediğiniz an değiştirebilirsiniz.",
+    saveLayoutButton: "Seçimi Kaydet ve Başla",
+
+    // Workspace Layout & Tabs
+    layoutSwitcherLabel: "Düzen",
+    layoutInlineShort: "Alt alta",
+    layoutTabsShort: "Sekmeli",
+    tabInvoiceDetails: "01 Fatura Detayları",
+    tabServices: "02 Hizmetler",
+    nextToServices: "Hizmetlere Geç",
+    backToDetails: "Fatura Detaylarına Dön",
+
     // Toasts
     logoUpdated: "Logo güncellendi",
     profileCreated: "Yeni profil oluşturuldu",
+    layoutUpdated: "Görünüm düzeni güncellendi",
+
+    // Modular Toolbar & Features
+    modularToolbarLabel: "Belge Modülleri",
+    moduleNotes: "Notlar",
+    modulePaymentInfo: "Banka / IBAN",
+    moduleDiscount: "İndirim",
+    moduleSignature: "İmza Alanı",
+    moduleDueDate: "Vade Tarihi",
+    
+    // Module Fields & Placeholders
+    paymentInfoTitle: "BANKA & ÖDEME BİLGİLERİ",
+    bankNameLabel: "Banka Adı",
+    bankNamePlaceholder: "Örn: Garanti BBVA, İş Bankası",
+    ibanLabel: "IBAN Numarası",
+    ibanPlaceholder: "TR00 0000 0000 0000 0000 0000 00",
+    accountHolderLabel: "Hesap Sahibi / Alıcı",
+    accountHolderPlaceholder: "Şirket Adı veya Ad Soyad",
+    
+    discountLabel: "İndirim Oranı (%)",
+    discountPlaceholder: "Örn: 10",
+    discountBadgeLabel: "İndirim",
+    discountAmountLabel: "İndirim",
+    
+    signatureBoxTitle: "ONAY & İMZA",
+    signatureTitleLabel: "İmzalayan Ünvanı",
+    signatureTitlePlaceholder: "Örn: Yetkili İmza / Kaşe",
+    signatureLineText: "Yetkili İmza / Kaşe",
+    
+    dueDateLabel: "Son Geçerlilik / Vade",
+    dueDateBadgeLabel: "Vade / Geçerlilik",
+    dueDatePrefix: "Son Geçerlilik",
+
+    // Font Options
+    fontSelectorLabel: "Yazı Tipi",
+    fontPlex: "IBM Plex Sans",
+    fontPlexSub: "Kurumsal Sans",
+    fontGeist: "Geist",
+    fontGeistSub: "Minimal Sans",
+    fontInter: "Inter",
+    fontInterSub: "Standart Sans",
+    fontJakarta: "Plus Jakarta",
+    fontJakartaSub: "Modern Sans",
+    fontSpace: "Space Grotesk",
+    fontSpaceSub: "Tech Sans",
+    fontPlayfair: "Playfair Display",
+    fontPlayfairSub: "Lüks Serif",
+    fontLora: "Lora",
+    fontLoraSub: "Klasik Serif",
   },
   en: {
     // Onboarding
@@ -119,6 +217,29 @@ export const TRANSLATIONS = {
     footerPreviewTitle: "Invoice Footer Live Preview",
     getStartedButton: "Get Started",
 
+    // Onboarding Layout Step & Layout Preferences
+    onboardingStepLayoutTitle: "Services Layout",
+    onboardingStepLayoutDesc: "Choose how services and line items should be displayed in your editor.",
+    layoutInlineTitle: "Stacked (Single View)",
+    layoutInlineDesc: "Invoice details and services are displayed together on a single scrollable page. Fast and direct.",
+    layoutTabsTitle: "Separate Tabs",
+    layoutTabsDesc: "Invoice details and services are organized into separate tabs. Clean and focused workspace.",
+
+    // Layout Selection Modal (Returning Users)
+    layoutModalTag: "LAYOUT PREFERENCE",
+    layoutModalTitle: "Choose Your Services Layout",
+    layoutModalDesc: "How would you like to view the services section when creating quotes? You can change this at any time.",
+    saveLayoutButton: "Save and Continue",
+
+    // Workspace Layout & Tabs
+    layoutSwitcherLabel: "Layout",
+    layoutInlineShort: "Stacked",
+    layoutTabsShort: "Tabs",
+    tabInvoiceDetails: "01 Invoice Details",
+    tabServices: "02 Services",
+    nextToServices: "Go to Services",
+    backToDetails: "Back to Details",
+
     // Profile & Settings Panel
     profileSectionTitle: "Profile",
     selectProfilePlaceholder: "Select Profile",
@@ -129,6 +250,25 @@ export const TRANSLATIONS = {
 
     // Invoice Form
     invoiceDetailsTitle: "Invoice Details",
+    billingTypeLabel: "Quote Type",
+    billingOneTime: "One-Time",
+    billingSubscription: "Subscription",
+    billingCycleLabel: "Billing Frequency",
+    cycleMonthly: "Monthly",
+    cycleYearly: "Yearly",
+    cycleQuarterly: "Quarterly",
+    cycleMonthlyBadge: "Monthly Subscription",
+    cycleYearlyBadge: "Annual Subscription",
+    cycleQuarterlyBadge: "Quarterly Subscription",
+    perMonth: "/ mo",
+    perYear: "/ yr",
+    perQuarter: "/ qtr",
+    periodStartLabel: "Start Date",
+    periodEndLabel: "End Date",
+    billingPeriodLabel: "Billing Period",
+    autoRenewalLabel: "Auto-renewing",
+    subscriptionDocumentTitle: "SUBSCRIPTION QUOTE",
+    subscriptionNoteTemplate: "This quote covers the subscription fee for the specified billing period. Automatically renews at the end of the term.",
     dateLabel: "Date",
     selectDatePlaceholder: "Select Date",
     kdvLabel: "Tax Rate",
@@ -162,6 +302,13 @@ export const TRANSLATIONS = {
 
     // Invoice Preview & PDF
     documentTitle: "SERVICE SUMMARY",
+    documentTitleLabel: "Document Title",
+    documentTitlePlaceholder: "e.g. SERVICE SUMMARY, QUOTE",
+    presetTitleServiceSummary: "Service Summary",
+    presetTitleQuote: "Price Quote",
+    presetTitleProforma: "Proforma Invoice",
+    presetTitleProposal: "Project Proposal",
+    presetTitleSubscription: "Subscription Quote",
     clientHeader: "ATTN",
     thService: "SERVICE",
     thQuantity: "QTY",
@@ -170,7 +317,7 @@ export const TRANSLATIONS = {
     noServicesAdded: "No services added yet.",
     unnamedService: "Unnamed Service",
     subtotalLabel: "Subtotal",
-    kdvTaxLabel: "VAT / Tax",
+    kdvTaxLabel: "VAT",
     totalLabel: "GRAND TOTAL",
 
     // Support Modal
@@ -183,5 +330,54 @@ export const TRANSLATIONS = {
     // Toasts
     logoUpdated: "Logo updated",
     profileCreated: "New profile created",
+    layoutUpdated: "Layout updated",
+
+    // Modular Toolbar & Features
+    modularToolbarLabel: "Document Modules",
+    moduleNotes: "Notes",
+    modulePaymentInfo: "Bank / IBAN",
+    moduleDiscount: "Discount",
+    moduleSignature: "Signature Area",
+    moduleDueDate: "Due Date",
+    
+    // Module Fields & Placeholders
+    paymentInfoTitle: "BANK & PAYMENT DETAILS",
+    bankNameLabel: "Bank Name",
+    bankNamePlaceholder: "e.g. Chase, Barclays, Wise",
+    ibanLabel: "IBAN / Account Number",
+    ibanPlaceholder: "GB00 XXXX 0000 0000 0000 00",
+    accountHolderLabel: "Account Holder",
+    accountHolderPlaceholder: "Company or Full Name",
+    
+    discountLabel: "Discount Rate (%)",
+    discountPlaceholder: "e.g. 10",
+    discountBadgeLabel: "Discount",
+    discountAmountLabel: "Discount",
+    
+    signatureBoxTitle: "APPROVAL & SIGNATURE",
+    signatureTitleLabel: "Signer Title",
+    signatureTitlePlaceholder: "e.g. Authorized Signatory",
+    signatureLineText: "Authorized Signature",
+    
+    dueDateLabel: "Due Date / Validity",
+    dueDateBadgeLabel: "Due Date",
+    dueDatePrefix: "Valid Until",
+
+    // Font Options
+    fontSelectorLabel: "Typography",
+    fontPlex: "IBM Plex Sans",
+    fontPlexSub: "Corporate Sans",
+    fontGeist: "Geist",
+    fontGeistSub: "Minimal Sans",
+    fontInter: "Inter",
+    fontInterSub: "Clean Sans",
+    fontJakarta: "Plus Jakarta",
+    fontJakartaSub: "Modern Sans",
+    fontSpace: "Space Grotesk",
+    fontSpaceSub: "Tech Sans",
+    fontPlayfair: "Playfair Display",
+    fontPlayfairSub: "Luxury Serif",
+    fontLora: "Lora",
+    fontLoraSub: "Classic Serif",
   },
 };
