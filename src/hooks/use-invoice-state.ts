@@ -1,29 +1,55 @@
 import { useState, useEffect } from "react";
-import { Profile, LineItem, InvoiceData, CustomTax } from "../types";
+import { Profile, LineItem, InvoiceData, CustomTax, ServicesLayout } from "../types";
 import { Language, Currency, TRANSLATIONS } from "../lib/i18n";
 import { toast } from "sonner";
 
 export const DEFAULT_COMPANY_LOGO = "";
 export const DEFAULT_CLIENT_LOGO = "https://images.pexels.com/photos/19023561/pexels-photo-19023561.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
 
-export const DEFAULT_TAXES: CustomTax[] = [
-  { id: "tax-0", name: "KDV", rate: 0 },
-  { id: "tax-10", name: "KDV", rate: 10 },
-  { id: "tax-20", name: "KDV", rate: 20 },
+export const getDefaultTaxes = (lang: Language): CustomTax[] => [
+  { id: "tax-0", name: lang === "en" ? "VAT" : "KDV", rate: 0 },
+  { id: "tax-10", name: lang === "en" ? "VAT" : "KDV", rate: 10 },
+  { id: "tax-20", name: lang === "en" ? "VAT" : "KDV", rate: 20 },
 ];
+
+export const DEFAULT_TAXES = getDefaultTaxes("tr");
 
 const getInitialDate = () => {
   const d = new Date();
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 };
 
+const getFutureDate = (monthsToAdd = 12) => {
+  const d = new Date();
+  d.setMonth(d.getMonth() + monthsToAdd);
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+};
+
 const emptyInvoiceData: InvoiceData = {
+  title: "",
   clientName: "Ahmet Yılmaz",
   date: getInitialDate(),
   notes: "Bizi tercih ettiğiniz için teşekkür ederiz.",
   kdvRate: 0,
   taxName: "KDV",
   taxId: "tax-0",
+  billingType: "one-time",
+  billingCycle: "yearly",
+  periodStart: getInitialDate(),
+  periodEnd: getFutureDate(12),
+  autoRenewal: true,
+  showNotes: true,
+  showPaymentInfo: false,
+  bankName: "",
+  iban: "",
+  accountHolder: "",
+  showDiscount: false,
+  discountRate: 0,
+  showSignature: false,
+  signatureTitle: "",
+  showDueDate: false,
+  dueDate: getFutureDate(1),
+  pdfFont: "plex",
 };
 
 export function useInvoiceState() {
@@ -34,10 +60,13 @@ export function useInvoiceState() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [language, setLanguageState] = useState<Language>("tr");
   const [currency, setCurrencyState] = useState<Currency>("TRY");
+  const [servicesLayout, setServicesLayoutState] = useState<ServicesLayout>("inline");
+  const [hasChosenServicesLayout, setHasChosenServicesLayout] = useState<boolean>(false);
   const [customTaxes, setCustomTaxes] = useState<CustomTax[]>([]);
 
   useEffect(() => {
     // Load preferences
+    let layoutFromPrefs: ServicesLayout | null = null;
     const savedPrefs = localStorage.getItem("quote-preferences");
     if (savedPrefs) {
       try {
@@ -48,9 +77,24 @@ export function useInvoiceState() {
         if (parsed.currency && ["TRY", "USD", "EUR", "GBP"].includes(parsed.currency)) {
           setCurrencyState(parsed.currency);
         }
+        if (parsed.servicesLayout === "inline" || parsed.servicesLayout === "tabs") {
+          layoutFromPrefs = parsed.servicesLayout;
+        }
       } catch (e) {
         console.error("Failed to parse preferences", e);
       }
+    }
+
+    const savedLayout = localStorage.getItem("quote-services-layout");
+    if (savedLayout === "inline" || savedLayout === "tabs") {
+      layoutFromPrefs = savedLayout;
+    }
+
+    if (layoutFromPrefs) {
+      setServicesLayoutState(layoutFromPrefs);
+      setHasChosenServicesLayout(true);
+    } else {
+      setHasChosenServicesLayout(false);
     }
 
     // Load custom taxes
@@ -63,6 +107,51 @@ export function useInvoiceState() {
         }
       } catch (e) {
         console.error("Failed to parse custom taxes", e);
+      }
+    }
+
+    // Load persistent quote creation preferences from localStorage
+    const savedCreationPrefs = localStorage.getItem("quote-creation-preferences");
+    if (savedCreationPrefs) {
+      try {
+        const parsed = JSON.parse(savedCreationPrefs);
+        if (parsed && typeof parsed === "object") {
+          setInvoiceData((prev) => ({
+            ...prev,
+            ...parsed,
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to parse creation preferences", e);
+      }
+    }
+
+    // Load in-progress / draft services from sessionStorage
+    const sessionLineItems = sessionStorage.getItem("quote-session-line-items");
+    if (sessionLineItems) {
+      try {
+        const parsed = JSON.parse(sessionLineItems);
+        if (Array.isArray(parsed)) {
+          setLineItems(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to parse session line items", e);
+      }
+    }
+
+    // Load active session draft metadata (e.g. clientName / date override) if in sessionStorage
+    const sessionDraft = sessionStorage.getItem("quote-session-draft");
+    if (sessionDraft) {
+      try {
+        const parsed = JSON.parse(sessionDraft);
+        if (parsed && typeof parsed === "object") {
+          setInvoiceData((prev) => ({
+            ...prev,
+            ...parsed,
+          }));
+        }
+      } catch (e) {
+        console.error("Failed to parse session draft", e);
       }
     }
 
@@ -86,6 +175,51 @@ export function useInvoiceState() {
     setIsLoaded(true);
   }, []);
 
+  // Save persistent quote creation preferences in localStorage
+  useEffect(() => {
+    if (isLoaded) {
+      const persistentPreferences = {
+        title: invoiceData.title,
+        pdfFont: invoiceData.pdfFont,
+        billingType: invoiceData.billingType,
+        billingCycle: invoiceData.billingCycle,
+        autoRenewal: invoiceData.autoRenewal,
+        kdvRate: invoiceData.kdvRate,
+        taxName: invoiceData.taxName,
+        taxId: invoiceData.taxId,
+        showNotes: invoiceData.showNotes,
+        notes: invoiceData.notes,
+        showPaymentInfo: invoiceData.showPaymentInfo,
+        bankName: invoiceData.bankName,
+        iban: invoiceData.iban,
+        accountHolder: invoiceData.accountHolder,
+        showDiscount: invoiceData.showDiscount,
+        discountRate: invoiceData.discountRate,
+        showSignature: invoiceData.showSignature,
+        signatureTitle: invoiceData.signatureTitle,
+        showDueDate: invoiceData.showDueDate,
+      };
+      localStorage.setItem("quote-creation-preferences", JSON.stringify(persistentPreferences));
+
+      // Save in-progress session draft (client info, specific dates) in sessionStorage
+      const sessionDraft = {
+        clientName: invoiceData.clientName,
+        date: invoiceData.date,
+        dueDate: invoiceData.dueDate,
+        periodStart: invoiceData.periodStart,
+        periodEnd: invoiceData.periodEnd,
+      };
+      sessionStorage.setItem("quote-session-draft", JSON.stringify(sessionDraft));
+    }
+  }, [invoiceData, isLoaded]);
+
+  // Save in-progress / draft services in sessionStorage
+  useEffect(() => {
+    if (isLoaded) {
+      sessionStorage.setItem("quote-session-line-items", JSON.stringify(lineItems));
+    }
+  }, [lineItems, isLoaded]);
+
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem("invoice-profiles", JSON.stringify(profiles));
@@ -94,9 +228,12 @@ export function useInvoiceState() {
 
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem("quote-preferences", JSON.stringify({ language, currency }));
+      localStorage.setItem("quote-preferences", JSON.stringify({ language, currency, servicesLayout }));
+      if (hasChosenServicesLayout) {
+        localStorage.setItem("quote-services-layout", servicesLayout);
+      }
     }
-  }, [language, currency, isLoaded]);
+  }, [language, currency, servicesLayout, hasChosenServicesLayout, isLoaded]);
 
   useEffect(() => {
     if (isLoaded) {
@@ -106,10 +243,23 @@ export function useInvoiceState() {
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
+    setInvoiceData((prev) => {
+      const isDefaultTax = !prev.taxId || prev.taxId.startsWith("tax-") || prev.taxName === "KDV" || prev.taxName === "VAT" || prev.taxName === "VAT / Tax";
+      return {
+        ...prev,
+        taxName: isDefaultTax ? (lang === "en" ? "VAT" : "KDV") : prev.taxName,
+      };
+    });
   };
 
   const setCurrency = (curr: Currency) => {
     setCurrencyState(curr);
+  };
+
+  const setServicesLayout = (layout: ServicesLayout) => {
+    setServicesLayoutState(layout);
+    setHasChosenServicesLayout(true);
+    localStorage.setItem("quote-services-layout", layout);
   };
 
   const addCustomTax = (name: string, rate: number) => {
@@ -165,8 +315,8 @@ export function useInvoiceState() {
     setLineItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Combine default + custom taxes
-  const allTaxes: CustomTax[] = [...DEFAULT_TAXES, ...customTaxes];
+  // Combine default (translated) + custom taxes
+  const allTaxes: CustomTax[] = [...getDefaultTaxes(language), ...customTaxes];
 
   return {
     isLoaded,
@@ -187,6 +337,9 @@ export function useInvoiceState() {
     setLanguage,
     currency,
     setCurrency,
+    servicesLayout,
+    setServicesLayout,
+    hasChosenServicesLayout,
     customTaxes,
     allTaxes,
     addCustomTax,
