@@ -30,12 +30,40 @@
 .font-pdf-playfair { font-family: var(--font-playfair), serif; }
 .font-pdf-lora { font-family: var(--font-lora), serif; }
 
+.preview-workspace {
+  background-image:
+    linear-gradient(rgba(23, 24, 21, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 24, 21, 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+  scrollbar-color: rgba(23, 24, 21, 0.2) transparent;
+  scrollbar-width: thin;
+}
+
+.preview-workspace::-webkit-scrollbar {
+  width: 8px;
+}
+
+.preview-workspace::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(23, 24, 21, 0.18);
+  background-clip: padding-box;
+}
+
 @layer base {
   body {
     @apply bg-background text-primary font-plex antialiased;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-geist tracking-tight text-primary;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
   }
 }
 

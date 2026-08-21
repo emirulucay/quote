@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Download, Upload, X, Coffee, Heart, Globe, Coins, ArrowLeft, ArrowRight, Check, ShieldCheck, Pencil, LayoutList, Columns2, Sparkles, RefreshCw, Building2, Percent, PenTool, CalendarClock, FileText, Type } from "lucide-react";
+import { Trash2, Plus, Minus, Download, Upload, X, Coffee, Heart, Globe, Coins, ArrowLeft, ArrowRight, Check, ShieldCheck, Pencil, LayoutList, Columns2, Sparkles, RefreshCw, Building2, Percent, PenTool, CalendarClock, FileText, Type, ChevronLeft } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { DEFAULT_COMPANY_LOGO } from "@/hooks/use-invoice-state";
@@ -22,7 +22,7 @@ import { format } from "date-fns";
 import { tr, enUS } from "date-fns/locale";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CURRENCIES, Language, Currency } from "@/lib/i18n";
 import { ServicesLayout, BillingType, BillingCycle, PdfFont } from "@/types";
@@ -56,6 +56,32 @@ const PDF_FONTS: { id: PdfFont; labelKey: string; subKey: string; fontClass: str
   { id: "playfair", labelKey: "fontPlayfair", subKey: "fontPlayfairSub", fontClass: "font-pdf-playfair", sample: "Aa" },
   { id: "lora", labelKey: "fontLora", subKey: "fontLoraSub", fontClass: "font-pdf-lora", sample: "Aa" },
 ];
+
+const DockPopoverCloseButton = ({ language }: { language: Language }) => (
+  <PopoverClose asChild>
+    <button
+      type="button"
+      className="flex size-8 shrink-0 items-center justify-center rounded-full border border-black/8 bg-white text-black/42 transition-colors hover:border-black/15 hover:bg-black/5 hover:text-black"
+      aria-label={language === "tr" ? "Paneli kapat" : "Close panel"}
+      title={language === "tr" ? "Kapat" : "Close"}
+    >
+      <X className="size-3.5" />
+    </button>
+  </PopoverClose>
+);
+
+const DockPopoverFooter = ({ language }: { language: Language }) => (
+  <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/8 pt-3">
+    <span className="text-[9px] leading-4 text-black/35">
+      {language === "tr" ? "Dışarı tıklayarak veya Esc ile de kapatabilirsiniz." : "You can also click outside or press Esc to close."}
+    </span>
+    <PopoverClose asChild>
+      <button type="button" className="h-8 shrink-0 rounded-full bg-[#171815] px-4 text-[10px] font-semibold text-white transition-colors hover:bg-black">
+        {language === "tr" ? "Tamam" : "Done"}
+      </button>
+    </PopoverClose>
+  </div>
+);
 
 const getFutureDate = (monthsToAdd = 12) => {
   const d = new Date();
@@ -105,9 +131,11 @@ export default function AppPage() {
   const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1);
   const [activeTab, setActiveTab] = useState<"details" | "services">("details");
   const [expandedDescriptions, setExpandedDescriptions] = useState<string[]>([]);
+  const [previewZoom, setPreviewZoom] = useState(90);
 
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newContactInfo, setNewContactInfo] = useState("");
+  const [newLogoBase64, setNewLogoBase64] = useState("");
 
   const [showTaxModal, setShowTaxModal] = useState(false);
   const [newTaxName, setNewTaxName] = useState("");
@@ -166,6 +194,11 @@ export default function AppPage() {
         if (pdfContainer) {
           pdfContainer.classList.add('pdf-export');
         }
+        const previewTransform = clonedDoc.querySelector<HTMLElement>('.pdf-preview-transform');
+        if (previewTransform) {
+          previewTransform.style.transform = 'none';
+          previewTransform.style.transition = 'none';
+        }
       }
     });
     const imgData = canvas.toDataURL("image/jpeg", 0.98);
@@ -202,13 +235,14 @@ export default function AppPage() {
 
     if (companyName) {
       if (editingProfileId) {
-        updateProfile(editingProfileId, { profileName: companyName, companyName, contactInfo });
+        updateProfile(editingProfileId, { profileName: companyName, companyName, contactInfo, logoBase64: newLogoBase64 });
         toast.success(language === "tr" ? "Profil güncellendi" : "Profile updated");
       } else {
-        saveAsNewProfile({ profileName: companyName, companyName, contactInfo, logoBase64: DEFAULT_COMPANY_LOGO });
+        saveAsNewProfile({ profileName: companyName, companyName, contactInfo, logoBase64: newLogoBase64 || DEFAULT_COMPANY_LOGO });
       }
       setNewCompanyName("");
       setNewContactInfo("");
+      setNewLogoBase64("");
       setEditingProfileId(null);
       setConfirmingProfileDelete(false);
       setShowProfileModal(false);
@@ -237,17 +271,62 @@ export default function AppPage() {
     }
   };
 
-  const handleLogoUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleProfileLogoUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && activeProfile) {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error(language === "tr" ? "Lütfen bir görsel dosyası seçin" : "Please choose an image file");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(language === "tr" ? "Logo dosyası 5 MB'dan küçük olmalı" : "Logo must be smaller than 5 MB");
+      e.target.value = "";
+      return;
+    }
+
+    if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        updateProfile(activeProfile.id, { logoBase64: reader.result as string });
-        toast.success(t.logoUpdated);
+        setNewLogoBase64(reader.result as string);
+        toast.success(language === "tr" ? "Logo hazır" : "Logo ready");
       };
       reader.readAsDataURL(file);
     }
+    e.target.value = "";
   };
+
+  const renderProfileLogoUploader = (inputId: string) => (
+    <div className="grid gap-2">
+      <Label className="text-[11px] font-semibold text-black/52">{language === "tr" ? "Şirket logosu" : "Company logo"}</Label>
+      <div className="flex items-center gap-3 rounded-2xl border border-dashed border-black/12 bg-white/65 p-3.5 transition-colors hover:border-black/24 hover:bg-white">
+        {newLogoBase64 ? (
+          <Image src={newLogoBase64} alt={language === "tr" ? "Logo önizlemesi" : "Logo preview"} width={64} height={64} className="size-14 shrink-0 rounded-xl border border-black/8 bg-white object-contain" />
+        ) : (
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-[#f1efe9] text-black/30">
+            <Upload className="size-4.5" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-black/72">{newLogoBase64 ? (language === "tr" ? "Logo seçildi" : "Logo selected") : (language === "tr" ? "Logo ekleyin" : "Add a logo")}</p>
+          <p className="mt-1 text-[10px] leading-4 text-black/36">{language === "tr" ? "PNG, JPG veya SVG · En fazla 5 MB" : "PNG, JPG or SVG · Up to 5 MB"}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Label htmlFor={inputId} className="flex h-9 cursor-pointer items-center rounded-full border border-black/10 bg-white px-3 text-[10px] font-semibold text-black/60 transition-colors hover:border-black/20 hover:text-black">
+            {newLogoBase64 ? (language === "tr" ? "Değiştir" : "Replace") : (language === "tr" ? "Yükle" : "Upload")}
+          </Label>
+          {newLogoBase64 && (
+            <button type="button" onClick={() => setNewLogoBase64("")} className="flex size-9 items-center justify-center rounded-full border border-black/8 bg-white text-black/36 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600" aria-label={language === "tr" ? "Logoyu kaldır" : "Remove logo"} title={language === "tr" ? "Logoyu kaldır" : "Remove logo"}>
+              <Trash2 className="size-3.5" />
+            </button>
+          )}
+        </div>
+        <Input id={inputId} type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleProfileLogoUpload} className="hidden" />
+      </div>
+    </div>
+  );
 
   // Services Layout Option Cards Component
   const renderLayoutOptionCards = (currentLayout: ServicesLayout, onSelect: (layout: ServicesLayout) => void) => (
@@ -381,13 +460,16 @@ export default function AppPage() {
       <Label lang="en" className="text-[10px] text-black/35 font-semibold uppercase tracking-[0.12em]">
         {t.footerPreviewTitle}
       </Label>
-      <div className="rounded-2xl border border-black/8 bg-[#f5f3ee] p-4 border-l-2 border-l-[#dff568]">
-        <p className="font-semibold text-sm text-primary">
-          {newCompanyName || (language === "tr" ? "Ad Soyad / Şirket" : "Full Name or Company Name")}
-        </p>
-        <p className="text-xs text-black/42 whitespace-pre-wrap mt-1.5 leading-5">
-          {newContactInfo || (language === "tr" ? "Email: info@sirket.com\nTel: +90 555 123 4567\nAdres: İstanbul, Türkiye" : "Email: info@company.com\nPhone: +1 555 123 4567\nAddress: New York, USA")}
-        </p>
+      <div className="flex items-start gap-3 rounded-2xl border border-black/8 border-l-2 border-l-[#dff568] bg-[#f5f3ee] p-4">
+        {newLogoBase64 && <Image src={newLogoBase64} alt="" width={44} height={44} className="size-11 shrink-0 rounded-lg border border-black/8 bg-white object-contain" />}
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-primary">
+            {newCompanyName || (language === "tr" ? "Ad Soyad / Şirket" : "Full Name or Company Name")}
+          </p>
+          <p className="mt-1.5 whitespace-pre-wrap text-xs leading-5 text-black/42">
+            {newContactInfo || (language === "tr" ? "Email: info@sirket.com\nTel: +90 555 123 4567\nAdres: İstanbul, Türkiye" : "Email: info@company.com\nPhone: +1 555 123 4567\nAddress: New York, USA")}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -493,8 +575,9 @@ export default function AppPage() {
 
                     <div className="mt-8 grid gap-5">
                       <div className="grid gap-2"><Label lang="en" htmlFor="new-company-name" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-black/48">{t.companyNameLabel}</Label><Input id="new-company-name" placeholder={t.companyNamePlaceholder} value={newCompanyName} onChange={(e) => setNewCompanyName(e.target.value)} autoFocus className="h-14 rounded-xl border-black/10 bg-white px-4 text-base shadow-none focus-visible:ring-[#171815]" /></div>
+                      {renderProfileLogoUploader("onboarding-profile-logo")}
                       <div className="grid gap-2"><Label lang="en" htmlFor="new-contact-info" className="text-[11px] font-semibold uppercase tracking-[0.12em] text-black/48">{language === "tr" ? "E-posta, telefon ve adres" : t.contactInfoLabel}</Label><textarea id="new-contact-info" placeholder={language === "tr" ? "E-posta: merhaba@sirket.com\nTelefon: +90 555 123 45 67\nAdres: istanbul, Türkiye" : "Email: hello@company.com\nPhone: +1 555 123 4567\nAddress: New York, USA"} value={newContactInfo} onChange={(e) => setNewContactInfo(e.target.value)} className="flex min-h-32 w-full resize-none rounded-xl border border-black/10 bg-white px-4 py-3 text-sm leading-6 outline-none placeholder:whitespace-pre-line placeholder:text-black/28 focus:border-black/35 focus:ring-1 focus:ring-black/20" /></div>
-                      <div className="rounded-2xl border border-black/8 bg-white p-5 shadow-[0_7px_24px_rgba(20,21,18,0.05)]"><p lang="en" className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/35">{language === "tr" ? "Fatura altbilgisi · canlı önizleme" : t.footerPreviewTitle}</p><div className="mt-4 border-l-2 border-[#dff568] pl-4"><p className="font-semibold text-[#171815]">{newCompanyName || (language === "tr" ? "Ad Soyad / Şirket" : "Full name or company")}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-black/42">{newContactInfo || (language === "tr" ? "E-posta\nTelefon\nAdres" : "Email\nPhone\nAddress")}</p></div></div>
+                      {renderFooterPreview()}
                     </div>
 
                     <div className="mt-8 flex gap-3"><button type="button" onClick={() => setOnboardingStep(2)} className="flex size-14 shrink-0 items-center justify-center rounded-full border border-black/12 bg-white transition-colors hover:bg-black/5 cursor-pointer" aria-label={t.backButton}><ArrowLeft className="size-4" /></button><button type="button" onClick={handleCreateProfile} className="group flex h-14 flex-1 items-center justify-center gap-3 rounded-full bg-[#171815] px-6 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(20,21,18,0.16)] transition-all hover:-translate-y-0.5 hover:bg-black cursor-pointer">{t.getStartedButton}<ArrowRight className="size-4 transition-transform group-hover:translate-x-1" /></button></div>
@@ -585,6 +668,7 @@ export default function AppPage() {
               onClick={() => {
                 setNewCompanyName("");
                 setNewContactInfo("");
+                setNewLogoBase64("");
                 setEditingProfileId(null);
                 setConfirmingProfileDelete(false);
                 setShowProfileModal(false);
@@ -610,6 +694,7 @@ export default function AppPage() {
                 className="h-12 rounded-xl border-black/10 bg-white px-4 shadow-none"
               />
             </div>
+            {renderProfileLogoUploader("modal-profile-logo")}
             <div className="grid gap-2">
               <Label htmlFor="modal-contact-info" className="text-[11px] font-semibold text-black/52">{language === "tr" ? "E-posta, telefon ve adres" : t.contactInfoLabel}</Label>
               <textarea
@@ -639,6 +724,7 @@ export default function AppPage() {
                       setConfirmingProfileDelete(false);
                       setNewCompanyName("");
                       setNewContactInfo("");
+                      setNewLogoBase64("");
                       setShowProfileModal(false);
                       toast.success(language === "tr" ? "Profil silindi" : "Profile deleted");
                     }}
@@ -655,6 +741,7 @@ export default function AppPage() {
                 onClick={() => {
                   setNewCompanyName("");
                   setNewContactInfo("");
+                  setNewLogoBase64("");
                   setEditingProfileId(null);
                   setConfirmingProfileDelete(false);
                   setShowProfileModal(false);
@@ -714,19 +801,19 @@ export default function AppPage() {
         <>
           <h1 className="sr-only">Quote – Minimal & Fast Invoice Generator</h1>
           {/* Left Panel */}
-          <div className="w-full lg:w-120 xl:w-132 h-full border-r border-black/8 bg-[#fbfaf7] shrink-0 flex flex-col relative z-10 shadow-[12px_0_40px_rgba(20,21,18,0.04)]">
-            <div className="flex-1 overflow-y-auto px-5 py-6 md:px-7 lg:px-8 flex flex-col gap-8">
+          <div className="relative z-10 flex h-full w-full shrink-0 flex-col border-r border-black/8 bg-[#fbfaf7] shadow-[12px_0_40px_rgba(20,21,18,0.04)] lg:w-108 xl:w-116">
+            <div className="flex flex-1 flex-col gap-8 overflow-y-auto px-5 py-6 md:px-7 lg:px-6">
 
               {/* Profile Switcher & Logo */}
               <section className="flex flex-col gap-4 border-b border-black/8 pb-7">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <QuoteLogo className="h-6 w-auto" />
                     <p className="mt-3 text-[11px] font-semibold tracking-[0.12em] text-black/35">{language === "tr" ? "YENI TEKLIF" : "NEW QUOTE"}</p>
                   </div>
 
-                  {/* Minimal Language, Currency & Layout Switcher */}
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  {/* Services Layout Switcher */}
+                  <div className="ml-auto flex shrink-0 items-center gap-1.5">
                     <div className="flex items-center rounded-full border border-black/10 bg-white p-0.5 shadow-none">
                       <button
                         type="button"
@@ -768,28 +855,6 @@ export default function AppPage() {
                       </button>
                     </div>
 
-                    <Select value={language} onValueChange={(val: Language) => setLanguage(val)}>
-                      <SelectTrigger className="h-9 px-3 w-auto shrink-0 border border-black/10 bg-white hover:bg-black/3 font-medium text-xs rounded-full shadow-none focus:ring-0 gap-1.5 cursor-pointer whitespace-nowrap">
-                        <span>{language === "tr" ? "🇹🇷 TR" : "🇬🇧 EN"}</span>
-                      </SelectTrigger>
-                      <SelectContent align="end">
-                        <SelectItem value="tr">🇹🇷 TR</SelectItem>
-                        <SelectItem value="en">🇬🇧 EN</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={currency} onValueChange={(val: Currency) => setCurrency(val)}>
-                      <SelectTrigger className="h-9 px-3 w-auto shrink-0 border border-black/10 bg-white hover:bg-black/3 font-geist font-semibold text-xs rounded-full shadow-none focus:ring-0 gap-1.5 cursor-pointer whitespace-nowrap">
-                        <span>{CURRENCIES[currency]?.symbol} {currency}</span>
-                      </SelectTrigger>
-                      <SelectContent align="end">
-                        {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {CURRENCIES[c].symbol} {c}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
                 <div className="flex gap-2 items-center mt-1">
@@ -803,26 +868,13 @@ export default function AppPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" onClick={() => { setEditingProfileId(null); setConfirmingProfileDelete(false); setNewCompanyName(""); setNewContactInfo(""); setShowProfileModal(true); }} className="h-11 rounded-xl border-black/10 bg-white px-4 cursor-pointer">
+                  <Button variant="outline" onClick={() => { setEditingProfileId(null); setConfirmingProfileDelete(false); setNewCompanyName(""); setNewContactInfo(""); setNewLogoBase64(""); setShowProfileModal(true); }} className="h-11 rounded-xl border-black/10 bg-white px-4 cursor-pointer">
                     <Plus className="size-4" /><span className="sr-only sm:not-sr-only sm:ml-1">{t.addNewProfile}</span>
                   </Button>
-                  <Button variant="outline" size="icon" aria-label={language === "tr" ? "Profili düzenle" : "Edit profile"} onClick={() => { setEditingProfileId(activeProfile.id); setConfirmingProfileDelete(false); setNewCompanyName(activeProfile.companyName); setNewContactInfo(activeProfile.contactInfo); setShowProfileModal(true); }} className="size-11 rounded-xl border-black/10 bg-white text-black/45 cursor-pointer hover:text-black">
+                  <Button variant="outline" size="icon" aria-label={language === "tr" ? "Profili düzenle" : "Edit profile"} onClick={() => { setEditingProfileId(activeProfile.id); setConfirmingProfileDelete(false); setNewCompanyName(activeProfile.companyName); setNewContactInfo(activeProfile.contactInfo); setNewLogoBase64(activeProfile.logoBase64 || ""); setShowProfileModal(true); }} className="size-11 rounded-xl border-black/10 bg-white text-black/45 cursor-pointer hover:text-black">
                     <Pencil className="size-3.5" />
                   </Button>
                 </div>
-                <Label className="group flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-black/12 bg-white/65 p-3 transition-all hover:border-black/28 hover:bg-white">
-                  {activeProfile.logoBase64 ? (
-                    <Image src={activeProfile.logoBase64} alt="Logo" width={56} height={56} className="size-12 object-contain bg-white rounded-xl border border-black/8" />
-                  ) : (
-                    <div className="flex size-12 items-center justify-center rounded-xl bg-[#f1efe9] text-black/32 transition-colors group-hover:bg-[#dff568]/55 group-hover:text-black"><Upload className="size-4" /></div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <span className="block text-xs font-semibold text-black/72">{language === "tr" ? "Şirket logosu" : "Company logo"}</span>
-                    <span className="mt-1 block text-[10px] leading-4 text-black/35">{activeProfile.logoBase64 ? (language === "tr" ? "Değiştirmek için tıklayın" : "Click to replace") : (language === "tr" ? "PNG, JPG veya SVG yükleyin" : "Upload PNG, JPG or SVG")}</span>
-                  </div>
-                  <span className="shrink-0 rounded-full border border-black/10 bg-white px-3 py-1.5 text-[10px] font-semibold text-black/55 transition-colors group-hover:border-black/20 group-hover:text-black">{activeProfile.logoBase64 ? t.changeLogo : (language === "tr" ? "Logo yükle" : "Upload logo")}</span>
-                  <Input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-                </Label>
               </section>
 
               {/* Tab Navigation if servicesLayout === "tabs" */}
@@ -901,34 +953,43 @@ export default function AppPage() {
                         }
                         className="h-11 rounded-xl border-black/10 bg-white px-4 text-xs font-semibold uppercase tracking-wider shadow-none placeholder:text-black/30 placeholder:normal-case placeholder:tracking-normal placeholder:font-normal"
                       />
-                      {/* Preset Pills */}
-                      <div className="flex flex-wrap gap-1.5 pt-0.5">
-                        {[
-                          { label: t.presetTitleServiceSummary, value: language === "tr" ? "HİZMET ÖZETİ" : "SERVICE SUMMARY" },
-                          { label: t.presetTitleQuote, value: language === "tr" ? "FİYAT TEKLİFİ" : "PRICE QUOTE" },
-                          { label: t.presetTitleProforma, value: language === "tr" ? "PROFORMA FATURA" : "PROFORMA INVOICE" },
-                          { label: t.presetTitleProposal, value: language === "tr" ? "PROJE TEKLİFİ" : "PROJECT PROPOSAL" },
-                        ].map((preset) => {
-                          const isSelected = invoiceData.title === preset.value;
-                          return (
-                            <button
-                              key={preset.value}
-                              type="button"
-                              onClick={() => {
-                                setInvoiceData({ ...invoiceData, title: preset.value });
-                                toast.success(`${preset.label} ${language === "tr" ? "başlığı seçildi" : "title selected"}`);
-                              }}
-                              className={cn(
-                                "rounded-lg border px-2.5 py-1 text-[10.5px] font-medium transition-all cursor-pointer",
-                                isSelected
-                                  ? "border-black bg-[#171815] text-white shadow-2xs"
-                                  : "border-black/8 bg-black/[0.02] text-black/60 hover:border-black/20 hover:bg-black/[0.05]"
-                              )}
-                            >
-                              {preset.label}
-                            </button>
-                          );
-                        })}
+                      {/* Preset Suggestions */}
+                      <div className="rounded-xl border border-dashed border-black/10 bg-black/[0.018] p-2.5">
+                        <div className="mb-2 flex items-center px-0.5">
+                          <span className="flex items-center gap-1.5 text-[9.5px] font-semibold text-black/52">
+                            <Sparkles className="size-3 text-[#7f9500]" />
+                            {t.titleSuggestionsLabel}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1" role="group" aria-label={t.titleSuggestionsLabel}>
+                          {[
+                            { label: t.presetTitleServiceSummary, value: language === "tr" ? "HİZMET ÖZETİ" : "SERVICE SUMMARY" },
+                            { label: t.presetTitleQuote, value: language === "tr" ? "FİYAT TEKLİFİ" : "PRICE QUOTE" },
+                            { label: t.presetTitleProforma, value: language === "tr" ? "PROFORMA FATURA" : "PROFORMA INVOICE" },
+                            { label: t.presetTitleProposal, value: language === "tr" ? "PROJE TEKLİFİ" : "PROJECT PROPOSAL" },
+                          ].map((preset) => {
+                            const isSelected = invoiceData.title === preset.value;
+                            return (
+                              <button
+                                key={preset.value}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => {
+                                  setInvoiceData({ ...invoiceData, title: preset.value });
+                                  toast.success(`${preset.label} ${language === "tr" ? "başlığı seçildi" : "title selected"}`);
+                                }}
+                                className={cn(
+                                  "min-w-0 whitespace-nowrap rounded-lg border px-1.5 py-1.5 text-[9px] font-medium transition-all cursor-pointer xl:text-[9.5px]",
+                                  isSelected
+                                    ? "border-black bg-[#171815] text-white shadow-2xs"
+                                    : "border-black/8 bg-white text-black/58 hover:border-black/20 hover:bg-black/[0.035] hover:text-black"
+                                )}
+                              >
+                                {preset.label}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
 
@@ -1026,189 +1087,6 @@ export default function AppPage() {
                         </Select>
                       </div>
                     </div>
-
-                    {/* Modular Options on Left Panel when active */}
-                    {invoiceData.showDueDate && (
-                      <div className="grid gap-1.5 rounded-xl border border-black/8 bg-white p-3 shadow-xs">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-semibold text-black/60 flex items-center gap-1.5">
-                            <CalendarClock className="size-3.5 text-black/50" />
-                            {t.dueDateLabel}
-                          </Label>
-                          <button
-                            type="button"
-                            onClick={() => setInvoiceData({ ...invoiceData, showDueDate: false })}
-                            className="text-[10px] text-black/35 hover:text-black cursor-pointer"
-                          >
-                            {language === "tr" ? "Kaldır" : "Remove"}
-                          </button>
-                        </div>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={"outline"}
-                              className="w-full h-10 rounded-lg border-black/10 bg-[#fbfaf7] justify-start text-left font-normal text-xs cursor-pointer shadow-none px-2.5"
-                            >
-                              <CalendarIcon className="mr-2 size-3.5 text-black/40" />
-                              {invoiceData.dueDate || getFutureDate(1)}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={parseTrDate(invoiceData.dueDate || getFutureDate(1))}
-                              onSelect={(date) => {
-                                if (date) {
-                                  setInvoiceData({ ...invoiceData, dueDate: format(date, "dd.MM.yyyy") });
-                                }
-                              }}
-                              initialFocus
-                              locale={language === "en" ? enUS : tr}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    )}
-
-                    {invoiceData.showDiscount && (
-                      <div className="grid gap-1.5 rounded-xl border border-black/8 bg-white p-3 shadow-xs">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-semibold text-black/60 flex items-center gap-1.5">
-                            <Percent className="size-3.5 text-black/50" />
-                            {t.discountLabel}
-                          </Label>
-                          <button
-                            type="button"
-                            onClick={() => setInvoiceData({ ...invoiceData, showDiscount: false })}
-                            className="text-[10px] text-black/35 hover:text-black cursor-pointer"
-                          >
-                            {language === "tr" ? "Kaldır" : "Remove"}
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={invoiceData.discountRate || ""}
-                            onChange={(e) => setInvoiceData({ ...invoiceData, discountRate: Number(e.target.value) })}
-                            placeholder={t.discountPlaceholder}
-                            className="h-10 rounded-lg border-black/10 bg-[#fbfaf7] text-xs"
-                          />
-                          <div className="flex gap-1">
-                            {[5, 10, 15, 20].map((rate) => (
-                              <button
-                                key={rate}
-                                type="button"
-                                onClick={() => setInvoiceData({ ...invoiceData, discountRate: rate })}
-                                className="rounded-lg border border-black/8 bg-white px-2.5 py-1.5 text-xs font-semibold hover:bg-black/5 cursor-pointer"
-                              >
-                                %{rate}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {invoiceData.showPaymentInfo && (
-                      <div className="grid gap-2.5 rounded-xl border border-black/8 bg-white p-3 shadow-xs">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-semibold text-black/60 flex items-center gap-1.5">
-                            <Building2 className="size-3.5 text-black/50" />
-                            {t.paymentInfoTitle}
-                          </Label>
-                          <button
-                            type="button"
-                            onClick={() => setInvoiceData({ ...invoiceData, showPaymentInfo: false })}
-                            className="text-[10px] text-black/35 hover:text-black cursor-pointer"
-                          >
-                            {language === "tr" ? "Kaldır" : "Remove"}
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <Label className="text-[9px] text-black/45">{t.bankNameLabel}</Label>
-                            <Input
-                              value={invoiceData.bankName || ""}
-                              onChange={(e) => setInvoiceData({ ...invoiceData, bankName: e.target.value })}
-                              placeholder={t.bankNamePlaceholder}
-                              className="h-9 text-xs bg-[#fbfaf7] rounded-lg border-black/10"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-[9px] text-black/45">{t.accountHolderLabel}</Label>
-                            <Input
-                              value={invoiceData.accountHolder || ""}
-                              onChange={(e) => setInvoiceData({ ...invoiceData, accountHolder: e.target.value })}
-                              placeholder={t.accountHolderPlaceholder}
-                              className="h-9 text-xs bg-[#fbfaf7] rounded-lg border-black/10"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-[9px] text-black/45">{t.ibanLabel}</Label>
-                          <Input
-                            value={invoiceData.iban || ""}
-                            onChange={(e) => setInvoiceData({ ...invoiceData, iban: e.target.value })}
-                            placeholder={t.ibanPlaceholder}
-                            className="h-9 text-xs bg-[#fbfaf7] rounded-lg border-black/10 font-mono"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {invoiceData.showSignature && (
-                      <div className="grid gap-1.5 rounded-xl border border-black/8 bg-white p-3 shadow-xs">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-semibold text-black/60 flex items-center gap-1.5">
-                            <PenTool className="size-3.5 text-black/50" />
-                            {t.signatureBoxTitle}
-                          </Label>
-                          <button
-                            type="button"
-                            onClick={() => setInvoiceData({ ...invoiceData, showSignature: false })}
-                            className="text-[10px] text-black/35 hover:text-black cursor-pointer"
-                          >
-                            {language === "tr" ? "Kaldır" : "Remove"}
-                          </button>
-                        </div>
-                        <Input
-                          value={invoiceData.signatureTitle ?? (language === "tr" ? "Yetkili İmza / Kaşe" : "Authorized Signature")}
-                          onChange={(e) => setInvoiceData({ ...invoiceData, signatureTitle: e.target.value })}
-                          placeholder={t.signatureTitlePlaceholder}
-                          className="h-10 rounded-lg border-black/10 bg-[#fbfaf7] text-xs"
-                        />
-                      </div>
-                    )}
-
-                    {/* Notes & Terms Field */}
-                    {invoiceData.showNotes !== false && (
-                      <div className="grid gap-2">
-                        <div className="flex items-center justify-between">
-                          <Label htmlFor="notes" className="text-[11px] font-semibold text-black/52">
-                            {language === "tr" ? "Notlar / Açıklama" : "Notes / Terms"}
-                          </Label>
-                          {invoiceData.billingType === "subscription" && !invoiceData.notes && (
-                            <button
-                              type="button"
-                              onClick={() => setInvoiceData({ ...invoiceData, notes: t.subscriptionNoteTemplate })}
-                              className="text-[10px] font-semibold text-[#728600] hover:underline cursor-pointer"
-                            >
-                              + {language === "tr" ? "Abonelik Notu Ekle" : "Add Subscription Note"}
-                            </button>
-                          )}
-                        </div>
-                        <textarea
-                          id="notes"
-                          rows={2}
-                          value={invoiceData.notes}
-                          onChange={(e) => setInvoiceData({ ...invoiceData, notes: e.target.value })}
-                          placeholder={invoiceData.billingType === "subscription" ? t.subscriptionNoteTemplate : (language === "tr" ? "Not veya ödeme şartları (isteğe bağlı)..." : "Notes or payment terms (optional)...")}
-                          className="flex min-h-16 w-full resize-none rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-xs leading-5 text-black/70 outline-none placeholder:text-black/28 focus:border-black/30 focus:ring-1 focus:ring-black/15"
-                        />
-                      </div>
-                    )}
 
                     {/* Button to proceed to Services Tab in tabbed mode */}
                     {servicesLayout === "tabs" && (
@@ -1333,23 +1211,98 @@ export default function AppPage() {
           </div>
 
           {/* Right Panel - Preview */}
-          <div className="flex-1 h-full bg-[#ebe9e3] flex flex-col items-center px-3 sm:px-6 pb-12 pt-6 overflow-y-auto relative">
-            <div className="pointer-events-none fixed bottom-4 right-4 z-30 hidden items-center gap-2 rounded-full border border-white/70 bg-[#fbfaf7]/90 px-3 py-1.5 text-[9px] font-medium text-black/48 shadow-[0_8px_24px_rgba(20,21,18,0.12)] backdrop-blur-md lg:flex">
-              <span className="size-1.5 rounded-full bg-[#8ba000]" />
-              {language === "tr" ? "Otomatik kaydedilir" : "Autosaved"}
-            </div>
+          <div className="preview-workspace relative flex h-full flex-1 flex-col overflow-y-auto bg-[#e8e6df]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_50%_0%,rgba(223,245,104,0.22),transparent_68%)]" />
+
+            <header className="sticky top-0 z-40 flex min-h-20 items-center justify-between gap-4 border-b border-black/7 bg-[#ebe9e3]/86 px-5 py-4 backdrop-blur-xl sm:px-7">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white/80 shadow-[0_5px_16px_rgba(20,21,18,0.06)]">
+                  <FileText className="size-4 text-black/65" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-black/38">
+                      {language === "tr" ? "Canlı önizleme" : "Live preview"}
+                    </p>
+                    <span className="size-1.5 rounded-full bg-[#8ba000] shadow-[0_0_0_3px_rgba(139,160,0,0.12)]" />
+                  </div>
+                  <p className="mt-0.5 truncate font-geist text-sm font-semibold text-[#171815]">
+                    {invoiceData.clientName || (language === "tr" ? "Yeni teklif" : "New quote")}
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <div className="flex h-9 items-center rounded-full border border-black/8 bg-white/75 p-0.5 shadow-[0_4px_14px_rgba(20,21,18,0.04)]" role="group" aria-label={language === "tr" ? "Önizleme yakınlaştırma" : "Preview zoom"}>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewZoom((zoom) => Math.max(60, zoom - 10))}
+                    disabled={previewZoom === 60}
+                    className="flex size-7 items-center justify-center rounded-full text-black/55 transition-colors hover:bg-black/6 hover:text-black disabled:cursor-not-allowed disabled:opacity-25"
+                    aria-label={language === "tr" ? "Uzaklaştır" : "Zoom out"}
+                    title={language === "tr" ? "Uzaklaştır" : "Zoom out"}
+                  >
+                    <Minus className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewZoom(100)}
+                    className="min-w-11 px-1 font-mono text-[9px] font-semibold tabular-nums text-black/58 transition-colors hover:text-black"
+                    aria-label={language === "tr" ? "Yakınlaştırmayı yüzde 100'e sıfırla" : "Reset zoom to 100 percent"}
+                    title={language === "tr" ? "Sıfırla" : "Reset"}
+                  >
+                    {previewZoom}%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewZoom((zoom) => Math.min(100, zoom + 10))}
+                    disabled={previewZoom === 100}
+                    className="flex size-7 items-center justify-center rounded-full text-black/55 transition-colors hover:bg-black/6 hover:text-black disabled:cursor-not-allowed disabled:opacity-25"
+                    aria-label={language === "tr" ? "Yakınlaştır" : "Zoom in"}
+                    title={language === "tr" ? "Yakınlaştır" : "Zoom in"}
+                  >
+                    <Plus className="size-3.5" />
+                  </button>
+                </div>
+                <span className="hidden rounded-full border border-black/8 bg-white/55 px-3 py-1.5 font-mono text-[9px] font-semibold tracking-wide text-black/45 sm:inline-flex">
+                  A4 · PDF
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-black/8 bg-white/75 px-3 py-1.5 text-[9px] font-semibold text-black/52 shadow-[0_4px_14px_rgba(20,21,18,0.04)]">
+                  <Check className="size-3 text-[#718400]" />
+                  {language === "tr" ? "Kaydedildi" : "Saved"}
+                </span>
+              </div>
+            </header>
 
             {/* Container for A4 Paper + Right Vertical Dock */}
-            <div className="relative flex flex-col xl:flex-row items-center xl:items-start justify-center gap-4 w-full max-w-260">
-              {/* A4 Paper */}
-              <div
-                ref={printRef}
-                className={cn(
-                  "pdf-container bg-white w-full max-w-198.5 shrink-0 overflow-hidden shadow-[0_24px_70px_-22px_rgba(20,21,18,0.2)] p-16 flex flex-col justify-start transition-all",
-                  getPdfFontClass(invoiceData.pdfFont)
-                )}
-                style={{ aspectRatio: "1/1.414" }}
-              >
+            <div className="relative z-10 mx-auto grid w-full max-w-288 items-start gap-5 px-3 pb-14 pt-5 sm:px-6 sm:pt-7 2xl:grid-cols-[minmax(0,1fr)_15rem] 2xl:px-7">
+              <div className="relative w-full overflow-auto rounded-[1.75rem] border border-white/65 bg-white/22 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] sm:p-4">
+                <span className="pointer-events-none absolute left-5 top-5 z-10 hidden rounded-full border border-black/7 bg-[#171815]/88 px-2.5 py-1 font-mono text-[8px] font-semibold tracking-[0.12em] text-white/70 shadow-lg sm:inline-flex">
+                  01 / 01
+                </span>
+                <div
+                  className="relative mx-auto shrink-0 transition-[width,max-width] duration-200 ease-out"
+                  style={{
+                    width: `${previewZoom}%`,
+                    maxWidth: `${49.625 * (previewZoom / 100)}rem`,
+                    aspectRatio: "1/1.414",
+                  }}
+                >
+                  <div
+                    className="pdf-preview-transform absolute left-0 top-0 origin-top-left transition-transform duration-200 ease-out"
+                    style={{
+                      width: `${100 / (previewZoom / 100)}%`,
+                      transform: `scale(${previewZoom / 100})`,
+                    }}
+                  >
+                    {/* A4 Paper */}
+                    <div
+                      ref={printRef}
+                      className={cn(
+                        "pdf-container flex w-full flex-col justify-start overflow-hidden bg-white p-16 shadow-[0_28px_80px_-20px_rgba(20,21,18,0.28),0_2px_8px_rgba(20,21,18,0.08)] transition-all",
+                        getPdfFontClass(invoiceData.pdfFont)
+                      )}
+                      style={{ aspectRatio: "1/1.414" }}
+                    >
                 {/* Centered Title */}
                 <div className="text-center mb-10 mt-6">
                   <h1 lang="en" className="text-2xl font-bold uppercase tracking-widest text-primary mb-2">
@@ -1533,16 +1486,19 @@ export default function AppPage() {
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{activeProfile.contactInfo}</p>
                   </div>
                 </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Right Vertical Modular Dock */}
-              <aside className="sticky top-6 flex flex-col gap-2.5 shrink-0 rounded-2xl border border-black/8 bg-[#fbfaf7]/95 p-2 shadow-[0_12px_32px_rgba(20,21,18,0.06)] backdrop-blur-md w-full sm:w-auto xl:w-44 z-30 transition-all">
+              <aside className="sticky top-24 z-30 flex w-full shrink-0 flex-col gap-3 rounded-[1.5rem] border border-black/8 bg-[#fbfaf7]/94 p-3 shadow-[0_18px_45px_rgba(20,21,18,0.1)] backdrop-blur-xl transition-all">
                 {/* Section 1: Document Type */}
-                <div className="flex flex-col gap-1">
-                  <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-wider text-black/35">
+                <div className="flex flex-col gap-1.5 px-0.5">
+                  <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-[0.14em] text-black/35">
                     {language === "tr" ? "Belge Tipi" : "Quote Type"}
                   </span>
-                  <div className="flex xl:flex-col gap-1 bg-black/[0.03] p-1 rounded-xl border border-black/6">
+                  <div className="flex gap-1 rounded-xl border border-black/6 bg-black/[0.035] p-1 2xl:flex-col">
                     <button
                       type="button"
                       onClick={() => {
@@ -1550,7 +1506,7 @@ export default function AppPage() {
                         toast.success(language === "tr" ? "Tek Seferlik mod seçildi" : "One-Time selected");
                       }}
                       className={cn(
-                        "flex flex-1 items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] font-semibold transition-all cursor-pointer",
+                        "flex flex-1 items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition-all cursor-pointer",
                         (!invoiceData.billingType || invoiceData.billingType === "one-time")
                           ? "bg-white text-black shadow-xs ring-1 ring-black/5"
                           : "text-black/50 hover:text-black hover:bg-white/50"
@@ -1578,7 +1534,7 @@ export default function AppPage() {
                         toast.success(language === "tr" ? "Abonelik modu seçildi" : "Subscription selected");
                       }}
                       className={cn(
-                        "flex flex-1 items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] font-semibold transition-all cursor-pointer",
+                        "flex flex-1 items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold transition-all cursor-pointer",
                         invoiceData.billingType === "subscription"
                           ? "bg-[#171815] text-white shadow-xs"
                           : "text-black/50 hover:text-black hover:bg-white/50"
@@ -1599,7 +1555,7 @@ export default function AppPage() {
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
-                      className="mt-1 flex flex-col gap-1.5 rounded-xl border border-black/8 bg-white p-2 text-[10px] shadow-2xs"
+                      className="mt-1 flex flex-col gap-2.5 rounded-2xl border border-black/8 bg-white p-3 text-[10px] shadow-2xs"
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[8px] font-bold uppercase tracking-wider text-black/45">
@@ -1634,7 +1590,7 @@ export default function AppPage() {
                                 });
                               }}
                               className={cn(
-                                "rounded py-1 text-[9px] font-semibold text-center transition-all cursor-pointer",
+                                "h-8 rounded-lg text-center text-[9.5px] font-semibold transition-all cursor-pointer",
                                 selected
                                   ? "bg-[#171815] text-white shadow-2xs"
                                   : "bg-black/[0.04] text-black/55 hover:bg-black/[0.08]"
@@ -1647,38 +1603,48 @@ export default function AppPage() {
                       </div>
 
                       {/* Start & End Dates */}
-                      <div className="grid grid-cols-2 gap-1 pt-0.5">
+                      <div className="grid grid-cols-2 gap-2 pt-0.5">
                         <div>
                           <span className="block text-[8px] text-black/40 mb-0.5">{t.periodStartLabel}</span>
                           <Popover>
                             <PopoverTrigger asChild>
                               <button
                                 type="button"
-                                className="w-full text-left truncate rounded border border-black/8 bg-[#fbfaf7] px-1.5 py-1 text-[9px] font-mono text-black/75 cursor-pointer hover:border-black/20"
+                                className="h-8 w-full truncate rounded-lg border border-black/8 bg-[#fbfaf7] px-2 text-left font-mono text-[9px] text-black/75 cursor-pointer hover:border-black/20"
                               >
                                 {invoiceData.periodStart || invoiceData.date}
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent side="left" align="start" className="w-auto p-2" sideOffset={10}>
-                              <Calendar
-                                mode="single"
-                                selected={parseTrDate(invoiceData.periodStart || invoiceData.date)}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    const startStr = format(date, "dd.MM.yyyy");
-                                    const endDate = new Date(date);
-                                    const months = invoiceData.billingCycle === "monthly" ? 1 : invoiceData.billingCycle === "quarterly" ? 3 : 12;
-                                    endDate.setMonth(endDate.getMonth() + months);
-                                    setInvoiceData({
-                                      ...invoiceData,
-                                      periodStart: startStr,
-                                      periodEnd: format(endDate, "dd.MM.yyyy"),
-                                    });
-                                  }
-                                }}
-                                initialFocus
-                                locale={language === "en" ? enUS : tr}
-                              />
+                            <PopoverContent side="left" align="center" collisionPadding={16} className="w-auto p-4" sideOffset={12}>
+                              <div className="flex items-center justify-between gap-4 border-b border-black/8 pb-3">
+                                <div>
+                                  <p className="text-[12px] font-bold text-black/85">{t.periodStartLabel}</p>
+                                  <p className="mt-1 text-[9px] text-black/40">{language === "tr" ? "Dönemin başlayacağı tarihi seçin." : "Choose when the period begins."}</p>
+                                </div>
+                                <DockPopoverCloseButton language={language} />
+                              </div>
+                              <div className="mt-3 rounded-xl border border-black/8 bg-white p-1">
+                                <Calendar
+                                  mode="single"
+                                  selected={parseTrDate(invoiceData.periodStart || invoiceData.date)}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const startStr = format(date, "dd.MM.yyyy");
+                                      const endDate = new Date(date);
+                                      const months = invoiceData.billingCycle === "monthly" ? 1 : invoiceData.billingCycle === "quarterly" ? 3 : 12;
+                                      endDate.setMonth(endDate.getMonth() + months);
+                                      setInvoiceData({
+                                        ...invoiceData,
+                                        periodStart: startStr,
+                                        periodEnd: format(endDate, "dd.MM.yyyy"),
+                                      });
+                                    }
+                                  }}
+                                  initialFocus
+                                  locale={language === "en" ? enUS : tr}
+                                />
+                              </div>
+                              <DockPopoverFooter language={language} />
                             </PopoverContent>
                           </Popover>
                         </div>
@@ -1689,23 +1655,33 @@ export default function AppPage() {
                             <PopoverTrigger asChild>
                               <button
                                 type="button"
-                                className="w-full text-left truncate rounded border border-black/8 bg-[#fbfaf7] px-1.5 py-1 text-[9px] font-mono text-black/75 cursor-pointer hover:border-black/20"
+                                className="h-8 w-full truncate rounded-lg border border-black/8 bg-[#fbfaf7] px-2 text-left font-mono text-[9px] text-black/75 cursor-pointer hover:border-black/20"
                               >
                                 {invoiceData.periodEnd || getFutureDate(12)}
                               </button>
                             </PopoverTrigger>
-                            <PopoverContent side="left" align="start" className="w-auto p-2" sideOffset={10}>
-                              <Calendar
-                                mode="single"
-                                selected={parseTrDate(invoiceData.periodEnd || getFutureDate(12))}
-                                onSelect={(date) => {
-                                  if (date) {
-                                    setInvoiceData({ ...invoiceData, periodEnd: format(date, "dd.MM.yyyy") });
-                                  }
-                                }}
-                                initialFocus
-                                locale={language === "en" ? enUS : tr}
-                              />
+                            <PopoverContent side="left" align="center" collisionPadding={16} className="w-auto p-4" sideOffset={12}>
+                              <div className="flex items-center justify-between gap-4 border-b border-black/8 pb-3">
+                                <div>
+                                  <p className="text-[12px] font-bold text-black/85">{t.periodEndLabel}</p>
+                                  <p className="mt-1 text-[9px] text-black/40">{language === "tr" ? "Dönemin biteceği tarihi seçin." : "Choose when the period ends."}</p>
+                                </div>
+                                <DockPopoverCloseButton language={language} />
+                              </div>
+                              <div className="mt-3 rounded-xl border border-black/8 bg-white p-1">
+                                <Calendar
+                                  mode="single"
+                                  selected={parseTrDate(invoiceData.periodEnd || getFutureDate(12))}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      setInvoiceData({ ...invoiceData, periodEnd: format(date, "dd.MM.yyyy") });
+                                    }
+                                  }}
+                                  initialFocus
+                                  locale={language === "en" ? enUS : tr}
+                                />
+                              </div>
+                              <DockPopoverFooter language={language} />
                             </PopoverContent>
                           </Popover>
                         </div>
@@ -1725,36 +1701,86 @@ export default function AppPage() {
                   )}
                 </div>
 
-                <div className="h-px bg-black/6 my-0.5" />
+                <div className="mx-1 h-px bg-black/7" />
 
                 {/* Section 2: Modules Stack */}
-                <div className="flex flex-col gap-1">
-                  <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-wider text-black/35">
+                <div className="flex flex-col gap-1.5 px-0.5">
+                  <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-[0.14em] text-black/35">
                     {language === "tr" ? "Modüller" : "Modules"}
                   </span>
 
-                  <div className="flex flex-wrap xl:flex-col gap-1">
-                    {/* Notes Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = invoiceData.showNotes === false ? true : false;
-                        setInvoiceData({ ...invoiceData, showNotes: next });
-                        toast.success(next ? (language === "tr" ? "Notlar açıldı" : "Notes enabled") : (language === "tr" ? "Notlar gizlendi" : "Notes hidden"));
-                      }}
-                      className={cn(
-                        "flex flex-1 xl:w-full items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] border transition-all cursor-pointer text-left",
-                        invoiceData.showNotes !== false
-                          ? "border-black/15 bg-white text-black font-semibold shadow-xs"
-                          : "border-transparent bg-transparent text-black/45 hover:text-black hover:bg-black/[0.04]"
-                      )}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <FileText className="size-3 text-black/60" />
-                        {t.moduleNotes}
-                      </span>
-                      <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showNotes !== false ? "bg-[#8ba000]" : "bg-black/20")} />
-                    </button>
+                  <div className="flex flex-wrap gap-1 2xl:flex-col">
+                    {/* Notes Popover */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(
+                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
+                            invoiceData.showNotes !== false
+                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
+                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
+                          )}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <FileText className="size-3 text-black/60" />
+                            {t.moduleNotes}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className={cn("size-1.5 shrink-0 rounded-full", invoiceData.showNotes !== false ? "bg-[#8ba000]" : "bg-black/20")} />
+                            <ChevronLeft className="size-3 text-black/28" />
+                          </span>
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent side="left" align="center" collisionPadding={16} className="w-82 p-4 text-xs" sideOffset={12}>
+                        <div className="flex items-start justify-between gap-3 border-b border-black/8 pb-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#eef7bd] text-[#637500]">
+                              <FileText className="size-4" />
+                            </span>
+                            <div>
+                              <p className="text-[12px] font-bold text-black/85">{language === "tr" ? "Notlar ve şartlar" : "Notes & terms"}</p>
+                              <p className="mt-1 text-[10px] leading-4 text-black/42">{language === "tr" ? "Belgenin sonunda müşterinize gösterilecek açıklama." : "The message shown to your client at the end of the document."}</p>
+                            </div>
+                          </div>
+                          <DockPopoverCloseButton language={language} />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = invoiceData.showNotes === false;
+                            setInvoiceData({ ...invoiceData, showNotes: next });
+                            toast.success(next ? (language === "tr" ? "Notlar açıldı" : "Notes enabled") : (language === "tr" ? "Notlar gizlendi" : "Notes hidden"));
+                          }}
+                          className={cn(
+                            "mt-3 flex h-9 w-full items-center justify-between rounded-xl px-3 text-[10px] font-semibold transition-colors",
+                            invoiceData.showNotes !== false ? "bg-[#eef7bd] text-[#4d5d00]" : "bg-black/5 text-black/50"
+                          )}
+                        >
+                          <span>{language === "tr" ? "Notları belgede göster" : "Show notes on document"}</span>
+                          <span className={cn("rounded-full px-2 py-1", invoiceData.showNotes !== false ? "bg-white/70" : "bg-white")}>{invoiceData.showNotes !== false ? (language === "tr" ? "Açık" : "On") : (language === "tr" ? "Kapalı" : "Off")}</span>
+                        </button>
+                        <div className="mt-4 space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <Label htmlFor="dock-notes" className="text-[10px] font-semibold text-black/52">{language === "tr" ? "Not metni" : "Note text"}</Label>
+                            {invoiceData.billingType === "subscription" && (
+                              <button type="button" onClick={() => setInvoiceData({ ...invoiceData, showNotes: true, notes: t.subscriptionNoteTemplate })} className="text-[9px] font-semibold text-[#687b00] hover:underline">
+                                {language === "tr" ? "Abonelik şablonu" : "Subscription template"}
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            id="dock-notes"
+                            rows={5}
+                            value={invoiceData.notes}
+                            onChange={(e) => setInvoiceData({ ...invoiceData, showNotes: true, notes: e.target.value })}
+                            placeholder={invoiceData.billingType === "subscription" ? t.subscriptionNoteTemplate : (language === "tr" ? "Bizi tercih ettiğiniz için teşekkür ederiz." : "Thank you for choosing us.")}
+                            className="flex min-h-28 w-full resize-y rounded-xl border border-black/10 bg-white px-3 py-2.5 text-[11px] leading-5 text-black/72 outline-none placeholder:text-black/28 focus:border-black/30 focus:ring-1 focus:ring-black/10"
+                          />
+                        </div>
+                        <DockPopoverFooter language={language} />
+                      </PopoverContent>
+                    </Popover>
 
                     {/* Bank / IBAN Popover */}
                     <Popover>
@@ -1762,69 +1788,80 @@ export default function AppPage() {
                         <button
                           type="button"
                           className={cn(
-                            "flex flex-1 xl:w-full items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] border transition-all cursor-pointer text-left",
+                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
                             invoiceData.showPaymentInfo
-                              ? "border-black/15 bg-white text-black font-semibold shadow-xs"
-                              : "border-transparent bg-transparent text-black/45 hover:text-black hover:bg-black/[0.04]"
+                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
+                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
                           )}
                         >
                           <span className="flex items-center gap-1.5">
                             <Building2 className="size-3 text-black/60" />
                             {t.modulePaymentInfo}
                           </span>
-                          <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showPaymentInfo ? "bg-[#8ba000]" : "bg-black/20")} />
+                          <span className="flex items-center gap-1.5">
+                            <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showPaymentInfo ? "bg-[#8ba000]" : "bg-black/20")} />
+                            <ChevronLeft className="size-3 text-black/28" />
+                          </span>
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent side="left" align="start" className="w-76 p-3 space-y-2.5 text-xs" sideOffset={10}>
-                        <div className="flex items-center justify-between pb-1.5 border-b border-black/8">
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="size-3.5 text-black/70" />
-                            <span className="text-[11px] font-bold text-black/80">{t.paymentInfoTitle}</span>
+                      <PopoverContent side="left" align="center" collisionPadding={16} className="w-82 p-4 text-xs" sideOffset={12}>
+                        <div className="flex items-start justify-between gap-3 border-b border-black/8 pb-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#eef7bd] text-[#637500]">
+                              <Building2 className="size-4" />
+                            </span>
+                            <div>
+                              <p className="text-[12px] font-bold text-black/85">{t.paymentInfoTitle}</p>
+                              <p className="mt-1 text-[10px] leading-4 text-black/42">{language === "tr" ? "Müşterinizin ödeme yapacağı hesap bilgileri." : "Account details your client can use for payment."}</p>
+                            </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = !invoiceData.showPaymentInfo;
-                              setInvoiceData({ ...invoiceData, showPaymentInfo: next });
-                              toast.success(next ? (language === "tr" ? "Banka bilgisi aktif" : "Payment info enabled") : (language === "tr" ? "Banka bilgisi kapalı" : "Payment info disabled"));
-                            }}
-                            className={cn(
-                              "text-[9px] font-semibold px-2 py-0.5 rounded-full cursor-pointer transition-colors",
-                              invoiceData.showPaymentInfo ? "bg-[#dff568] text-black" : "bg-black/10 text-black/50"
-                            )}
-                          >
-                            {invoiceData.showPaymentInfo ? (language === "tr" ? "Aktif" : "Active") : (language === "tr" ? "Kapalı" : "Disabled")}
-                          </button>
+                          <DockPopoverCloseButton language={language} />
                         </div>
-                        <div className="space-y-2">
-                          <div>
-                            <Label className="text-[9px] text-black/50">{t.bankNameLabel}</Label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !invoiceData.showPaymentInfo;
+                            setInvoiceData({ ...invoiceData, showPaymentInfo: next });
+                            toast.success(next ? (language === "tr" ? "Banka bilgisi aktif" : "Payment info enabled") : (language === "tr" ? "Banka bilgisi kapalı" : "Payment info disabled"));
+                          }}
+                          className={cn(
+                            "mt-3 flex h-9 w-full items-center justify-between rounded-xl px-3 text-[10px] font-semibold transition-colors",
+                            invoiceData.showPaymentInfo ? "bg-[#eef7bd] text-[#4d5d00]" : "bg-black/5 text-black/50"
+                          )}
+                        >
+                          <span>{language === "tr" ? "Belgede göster" : "Show on document"}</span>
+                          <span className={cn("rounded-full px-2 py-1", invoiceData.showPaymentInfo ? "bg-white/70" : "bg-white")}>{invoiceData.showPaymentInfo ? (language === "tr" ? "Açık" : "On") : (language === "tr" ? "Kapalı" : "Off")}</span>
+                        </button>
+                        <div className="mt-4 space-y-3">
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] font-semibold text-black/52">{t.bankNameLabel}</Label>
                             <Input
                               value={invoiceData.bankName || ""}
                               onChange={(e) => setInvoiceData({ ...invoiceData, showPaymentInfo: true, bankName: e.target.value })}
                               placeholder={t.bankNamePlaceholder}
-                              className="h-7 text-[11px] bg-[#fbfaf7]"
+                              className="h-10 rounded-xl border-black/10 bg-white px-3 text-[11px]"
                             />
                           </div>
-                          <div>
-                            <Label className="text-[9px] text-black/50">{t.accountHolderLabel}</Label>
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] font-semibold text-black/52">{t.accountHolderLabel}</Label>
                             <Input
                               value={invoiceData.accountHolder || ""}
                               onChange={(e) => setInvoiceData({ ...invoiceData, showPaymentInfo: true, accountHolder: e.target.value })}
                               placeholder={t.accountHolderPlaceholder}
-                              className="h-7 text-[11px] bg-[#fbfaf7]"
+                              className="h-10 rounded-xl border-black/10 bg-white px-3 text-[11px]"
                             />
                           </div>
-                          <div>
-                            <Label className="text-[9px] text-black/50">{t.ibanLabel}</Label>
+                          <div className="space-y-1.5">
+                            <Label className="text-[10px] font-semibold text-black/52">{t.ibanLabel}</Label>
                             <Input
                               value={invoiceData.iban || ""}
                               onChange={(e) => setInvoiceData({ ...invoiceData, showPaymentInfo: true, iban: e.target.value })}
                               placeholder={t.ibanPlaceholder}
-                              className="h-7 text-[11px] bg-[#fbfaf7] font-mono"
+                              className="h-10 rounded-xl border-black/10 bg-white px-3 font-mono text-[11px]"
                             />
                           </div>
                         </div>
+                        <DockPopoverFooter language={language} />
                       </PopoverContent>
                     </Popover>
 
@@ -1834,47 +1871,57 @@ export default function AppPage() {
                         <button
                           type="button"
                           className={cn(
-                            "flex flex-1 xl:w-full items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] border transition-all cursor-pointer text-left",
+                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
                             invoiceData.showDiscount
-                              ? "border-black/15 bg-white text-black font-semibold shadow-xs"
-                              : "border-transparent bg-transparent text-black/45 hover:text-black hover:bg-black/[0.04]"
+                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
+                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
                           )}
                         >
                           <span className="flex items-center gap-1.5">
                             <Percent className="size-3 text-black/60" />
                             {t.moduleDiscount}
                           </span>
-                          {invoiceData.showDiscount && invoiceData.discountRate ? (
-                            <span className="text-[9.5px] font-mono text-[#6f8500] font-bold">%{invoiceData.discountRate}</span>
-                          ) : (
-                            <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showDiscount ? "bg-[#8ba000]" : "bg-black/20")} />
-                          )}
+                          <span className="flex items-center gap-1.5">
+                            {invoiceData.showDiscount && invoiceData.discountRate ? (
+                              <span className="font-mono text-[9.5px] font-bold text-[#6f8500]">%{invoiceData.discountRate}</span>
+                            ) : (
+                              <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showDiscount ? "bg-[#8ba000]" : "bg-black/20")} />
+                            )}
+                            <ChevronLeft className="size-3 text-black/28" />
+                          </span>
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent side="left" align="start" className="w-64 p-3 space-y-2.5 text-xs" sideOffset={10}>
-                        <div className="flex items-center justify-between pb-1.5 border-b border-black/8">
-                          <div className="flex items-center gap-1.5">
-                            <Percent className="size-3.5 text-black/70" />
-                            <span className="text-[11px] font-bold text-black/80">{t.discountBadgeLabel}</span>
+                      <PopoverContent side="left" align="center" collisionPadding={16} className="w-78 p-4 text-xs" sideOffset={12}>
+                        <div className="flex items-start justify-between gap-3 border-b border-black/8 pb-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#eef7bd] text-[#637500]">
+                              <Percent className="size-4" />
+                            </span>
+                            <div>
+                              <p className="text-[12px] font-bold text-black/85">{t.discountBadgeLabel}</p>
+                              <p className="mt-1 text-[10px] leading-4 text-black/42">{language === "tr" ? "Ara toplam üzerinden uygulanacak indirimi belirleyin." : "Set a discount applied to the subtotal."}</p>
+                            </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = !invoiceData.showDiscount;
-                              setInvoiceData({ ...invoiceData, showDiscount: next });
-                              toast.success(next ? (language === "tr" ? "İndirim aktif" : "Discount enabled") : (language === "tr" ? "İndirim kapalı" : "Discount disabled"));
-                            }}
-                            className={cn(
-                              "text-[9px] font-semibold px-2 py-0.5 rounded-full cursor-pointer transition-colors",
-                              invoiceData.showDiscount ? "bg-[#dff568] text-black" : "bg-black/10 text-black/50"
-                            )}
-                          >
-                            {invoiceData.showDiscount ? (language === "tr" ? "Aktif" : "Active") : (language === "tr" ? "Kapalı" : "Disabled")}
-                          </button>
+                          <DockPopoverCloseButton language={language} />
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-[9px] text-black/50">{t.discountLabel}</Label>
-                          <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !invoiceData.showDiscount;
+                            setInvoiceData({ ...invoiceData, showDiscount: next });
+                            toast.success(next ? (language === "tr" ? "İndirim aktif" : "Discount enabled") : (language === "tr" ? "İndirim kapalı" : "Discount disabled"));
+                          }}
+                          className={cn(
+                            "mt-3 flex h-9 w-full items-center justify-between rounded-xl px-3 text-[10px] font-semibold transition-colors",
+                            invoiceData.showDiscount ? "bg-[#eef7bd] text-[#4d5d00]" : "bg-black/5 text-black/50"
+                          )}
+                        >
+                          <span>{language === "tr" ? "İndirimi uygula" : "Apply discount"}</span>
+                          <span className={cn("rounded-full px-2 py-1", invoiceData.showDiscount ? "bg-white/70" : "bg-white")}>{invoiceData.showDiscount ? (language === "tr" ? "Açık" : "On") : (language === "tr" ? "Kapalı" : "Off")}</span>
+                        </button>
+                        <div className="mt-4 space-y-3">
+                          <Label className="text-[10px] font-semibold text-black/52">{t.discountLabel}</Label>
+                          <div className="relative">
                             <Input
                               type="number"
                               min="0"
@@ -1882,22 +1929,24 @@ export default function AppPage() {
                               value={invoiceData.discountRate || ""}
                               onChange={(e) => setInvoiceData({ ...invoiceData, showDiscount: true, discountRate: Number(e.target.value) })}
                               placeholder={t.discountPlaceholder}
-                              className="h-7 text-[11px] bg-[#fbfaf7]"
+                              className="h-11 rounded-xl border-black/10 bg-white px-3 pr-9 text-sm font-semibold"
                             />
-                            <div className="flex gap-1">
-                              {[5, 10, 15, 20].map((rate) => (
-                                <button
-                                  key={rate}
-                                  type="button"
-                                  onClick={() => setInvoiceData({ ...invoiceData, showDiscount: true, discountRate: rate })}
-                                  className="rounded border border-black/8 bg-white px-1.5 py-0.5 text-[9px] font-semibold hover:bg-black/5 cursor-pointer"
-                                >
-                                  %{rate}
-                                </button>
-                              ))}
-                            </div>
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-black/35">%</span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {[5, 10, 15, 20].map((rate) => (
+                              <button
+                                key={rate}
+                                type="button"
+                                onClick={() => setInvoiceData({ ...invoiceData, showDiscount: true, discountRate: rate })}
+                                className={cn("h-9 rounded-xl border text-[10px] font-semibold transition-colors", invoiceData.showDiscount && invoiceData.discountRate === rate ? "border-[#b8ca62] bg-[#eef7bd] text-[#4d5d00]" : "border-black/8 bg-white hover:border-black/18 hover:bg-black/[0.025]")}
+                              >
+                                %{rate}
+                              </button>
+                            ))}
                           </div>
                         </div>
+                        <DockPopoverFooter language={language} />
                       </PopoverContent>
                     </Popover>
 
@@ -1907,49 +1956,60 @@ export default function AppPage() {
                         <button
                           type="button"
                           className={cn(
-                            "flex flex-1 xl:w-full items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] border transition-all cursor-pointer text-left",
+                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
                             invoiceData.showSignature
-                              ? "border-black/15 bg-white text-black font-semibold shadow-xs"
-                              : "border-transparent bg-transparent text-black/45 hover:text-black hover:bg-black/[0.04]"
+                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
+                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
                           )}
                         >
                           <span className="flex items-center gap-1.5">
                             <PenTool className="size-3 text-black/60" />
                             {t.moduleSignature}
                           </span>
-                          <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showSignature ? "bg-[#8ba000]" : "bg-black/20")} />
+                          <span className="flex items-center gap-1.5">
+                            <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showSignature ? "bg-[#8ba000]" : "bg-black/20")} />
+                            <ChevronLeft className="size-3 text-black/28" />
+                          </span>
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent side="left" align="start" className="w-68 p-3 space-y-2.5 text-xs" sideOffset={10}>
-                        <div className="flex items-center justify-between pb-1.5 border-b border-black/8">
-                          <div className="flex items-center gap-1.5">
-                            <PenTool className="size-3.5 text-black/70" />
-                            <span className="text-[11px] font-bold text-black/80">{t.signatureBoxTitle}</span>
+                      <PopoverContent side="left" align="center" collisionPadding={16} className="w-78 p-4 text-xs" sideOffset={12}>
+                        <div className="flex items-start justify-between gap-3 border-b border-black/8 pb-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#eef7bd] text-[#637500]">
+                              <PenTool className="size-4" />
+                            </span>
+                            <div>
+                              <p className="text-[12px] font-bold text-black/85">{t.signatureBoxTitle}</p>
+                              <p className="mt-1 text-[10px] leading-4 text-black/42">{language === "tr" ? "Belgenin sonuna imza ve kaşe alanı ekleyin." : "Add a signature and stamp area to the document."}</p>
+                            </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = !invoiceData.showSignature;
-                              setInvoiceData({ ...invoiceData, showSignature: next });
-                              toast.success(next ? (language === "tr" ? "İmza alanı aktif" : "Signature enabled") : (language === "tr" ? "İmza alanı kapalı" : "Signature disabled"));
-                            }}
-                            className={cn(
-                              "text-[9px] font-semibold px-2 py-0.5 rounded-full cursor-pointer transition-colors",
-                              invoiceData.showSignature ? "bg-[#dff568] text-black" : "bg-black/10 text-black/50"
-                            )}
-                          >
-                            {invoiceData.showSignature ? (language === "tr" ? "Aktif" : "Active") : (language === "tr" ? "Kapalı" : "Disabled")}
-                          </button>
+                          <DockPopoverCloseButton language={language} />
                         </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-[9px] text-black/50">{t.signatureTitleLabel}</Label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !invoiceData.showSignature;
+                            setInvoiceData({ ...invoiceData, showSignature: next });
+                            toast.success(next ? (language === "tr" ? "İmza alanı aktif" : "Signature enabled") : (language === "tr" ? "İmza alanı kapalı" : "Signature disabled"));
+                          }}
+                          className={cn(
+                            "mt-3 flex h-9 w-full items-center justify-between rounded-xl px-3 text-[10px] font-semibold transition-colors",
+                            invoiceData.showSignature ? "bg-[#eef7bd] text-[#4d5d00]" : "bg-black/5 text-black/50"
+                          )}
+                        >
+                          <span>{language === "tr" ? "İmza alanını göster" : "Show signature area"}</span>
+                          <span className={cn("rounded-full px-2 py-1", invoiceData.showSignature ? "bg-white/70" : "bg-white")}>{invoiceData.showSignature ? (language === "tr" ? "Açık" : "On") : (language === "tr" ? "Kapalı" : "Off")}</span>
+                        </button>
+                        <div className="mt-4 space-y-1.5">
+                          <Label className="text-[10px] font-semibold text-black/52">{t.signatureTitleLabel}</Label>
                           <Input
                             value={invoiceData.signatureTitle ?? (language === "tr" ? "Yetkili İmza / Kaşe" : "Authorized Signature")}
                             onChange={(e) => setInvoiceData({ ...invoiceData, showSignature: true, signatureTitle: e.target.value })}
                             placeholder={t.signatureTitlePlaceholder}
-                            className="h-7 text-[11px] bg-[#fbfaf7]"
+                            className="h-10 rounded-xl border-black/10 bg-white px-3 text-[11px]"
                           />
                         </div>
+                        <DockPopoverFooter language={language} />
                       </PopoverContent>
                     </Popover>
 
@@ -1959,68 +2019,124 @@ export default function AppPage() {
                         <button
                           type="button"
                           className={cn(
-                            "flex flex-1 xl:w-full items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] border transition-all cursor-pointer text-left",
+                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
                             invoiceData.showDueDate
-                              ? "border-black/15 bg-white text-black font-semibold shadow-xs"
-                              : "border-transparent bg-transparent text-black/45 hover:text-black hover:bg-black/[0.04]"
+                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
+                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
                           )}
                         >
                           <span className="flex items-center gap-1.5">
                             <CalendarClock className="size-3 text-black/60" />
                             {t.moduleDueDate}
                           </span>
-                          <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showDueDate ? "bg-[#8ba000]" : "bg-black/20")} />
+                          <span className="flex items-center gap-1.5">
+                            <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showDueDate ? "bg-[#8ba000]" : "bg-black/20")} />
+                            <ChevronLeft className="size-3 text-black/28" />
+                          </span>
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent side="left" align="start" className="w-auto p-2.5 space-y-2 text-xs" sideOffset={10}>
-                        <div className="flex items-center justify-between pb-1.5 border-b border-black/8">
-                          <div className="flex items-center gap-1.5">
-                            <CalendarClock className="size-3.5 text-black/70" />
-                            <span className="text-[11px] font-bold text-black/80">{t.dueDateBadgeLabel}</span>
+                      <PopoverContent side="left" align="center" collisionPadding={16} className="w-auto p-4 text-xs" sideOffset={12}>
+                        <div className="flex items-start justify-between gap-3 border-b border-black/8 pb-3">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#eef7bd] text-[#637500]">
+                              <CalendarClock className="size-4" />
+                            </span>
+                            <div>
+                              <p className="text-[12px] font-bold text-black/85">{t.dueDateBadgeLabel}</p>
+                              <p className="mt-1 max-w-52 text-[10px] leading-4 text-black/42">{language === "tr" ? "Ödeme veya teklif geçerlilik tarihini seçin." : "Choose the payment or quote validity date."}</p>
+                            </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = !invoiceData.showDueDate;
-                              setInvoiceData({ ...invoiceData, showDueDate: next });
-                              toast.success(next ? (language === "tr" ? "Vade tarihi aktif" : "Due date enabled") : (language === "tr" ? "Vade tarihi kapalı" : "Due date disabled"));
-                            }}
-                            className={cn(
-                              "text-[9px] font-semibold px-2 py-0.5 rounded-full cursor-pointer transition-colors",
-                              invoiceData.showDueDate ? "bg-[#dff568] text-black" : "bg-black/10 text-black/50"
-                            )}
-                          >
-                            {invoiceData.showDueDate ? (language === "tr" ? "Aktif" : "Active") : (language === "tr" ? "Kapalı" : "Disabled")}
-                          </button>
+                          <DockPopoverCloseButton language={language} />
                         </div>
-                        <Calendar
-                          mode="single"
-                          selected={parseTrDate(invoiceData.dueDate || getFutureDate(1))}
-                          onSelect={(date) => {
-                            if (date) {
-                              setInvoiceData({ ...invoiceData, showDueDate: true, dueDate: format(date, "dd.MM.yyyy") });
-                            }
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = !invoiceData.showDueDate;
+                            setInvoiceData({ ...invoiceData, showDueDate: next });
+                            toast.success(next ? (language === "tr" ? "Vade tarihi aktif" : "Due date enabled") : (language === "tr" ? "Vade tarihi kapalı" : "Due date disabled"));
                           }}
-                          initialFocus
-                          locale={language === "en" ? enUS : tr}
-                        />
+                          className={cn(
+                            "mt-3 flex h-9 w-full items-center justify-between rounded-xl px-3 text-[10px] font-semibold transition-colors",
+                            invoiceData.showDueDate ? "bg-[#eef7bd] text-[#4d5d00]" : "bg-black/5 text-black/50"
+                          )}
+                        >
+                          <span>{language === "tr" ? "Tarihi belgede göster" : "Show date on document"}</span>
+                          <span className={cn("rounded-full px-2 py-1", invoiceData.showDueDate ? "bg-white/70" : "bg-white")}>{invoiceData.showDueDate ? (language === "tr" ? "Açık" : "On") : (language === "tr" ? "Kapalı" : "Off")}</span>
+                        </button>
+                        <div className="mt-3 rounded-xl border border-black/8 bg-white p-1">
+                          <Calendar
+                            mode="single"
+                            selected={parseTrDate(invoiceData.dueDate || getFutureDate(1))}
+                            onSelect={(date) => {
+                              if (date) {
+                                setInvoiceData({ ...invoiceData, showDueDate: true, dueDate: format(date, "dd.MM.yyyy") });
+                              }
+                            }}
+                            initialFocus
+                            locale={language === "en" ? enUS : tr}
+                          />
+                        </div>
+                        <DockPopoverFooter language={language} />
                       </PopoverContent>
                     </Popover>
                   </div>
                 </div>
 
-                <div className="h-px bg-black/6 my-0.5" />
+                <div className="mx-1 h-px bg-black/7" />
 
-                {/* Section 3: PDF Font Selector */}
-                <div className="flex flex-col gap-1">
-                  <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-wider text-black/35">
+                {/* Section 3: Document Locale */}
+                <div className="flex flex-col gap-1.5 px-0.5">
+                  <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-[0.14em] text-black/35">
+                    {language === "tr" ? "Dil ve para birimi" : "Language & currency"}
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-black/8 bg-white/55 p-2">
+                    <div className="min-w-0 space-y-1">
+                      <span className="block px-1 text-[8px] font-semibold text-black/38">
+                        {language === "tr" ? "Dil" : "Language"}
+                      </span>
+                      <Select value={language} onValueChange={(val: Language) => setLanguage(val)}>
+                        <SelectTrigger aria-label={t.languageLabel} className="h-9 w-full min-w-0 rounded-lg border-black/8 bg-white px-2.5 text-[10.5px] font-semibold shadow-none focus:ring-0 cursor-pointer">
+                          <span className="whitespace-nowrap">{language === "tr" ? "🇹🇷 TR" : "🇬🇧 EN"}</span>
+                        </SelectTrigger>
+                        <SelectContent align="start">
+                          <SelectItem value="tr">🇹🇷 Türkçe</SelectItem>
+                          <SelectItem value="en">🇬🇧 English</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="min-w-0 space-y-1">
+                      <span className="block px-1 text-[8px] font-semibold text-black/38">
+                        {language === "tr" ? "Para birimi" : "Currency"}
+                      </span>
+                      <Select value={currency} onValueChange={(val: Currency) => setCurrency(val)}>
+                        <SelectTrigger aria-label={t.currencyLabel} className="h-9 w-full min-w-0 rounded-lg border-black/8 bg-white px-2.5 font-geist text-[10.5px] font-semibold shadow-none focus:ring-0 cursor-pointer">
+                          <span className="whitespace-nowrap">{CURRENCIES[currency]?.symbol} {currency}</span>
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                          {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {CURRENCIES[c].symbol} {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mx-1 h-px bg-black/7" />
+
+                {/* Section 4: PDF Font Selector */}
+                <div className="flex flex-col gap-1.5 px-0.5 pb-0.5">
+                  <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-[0.14em] text-black/35">
                     {t.fontSelectorLabel}
                   </span>
                   <Popover>
                     <PopoverTrigger asChild>
                       <button
                         type="button"
-                        className="flex w-full items-center justify-between gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-1.5 text-[10.5px] font-semibold text-black shadow-xs transition-all hover:bg-black/[0.02] cursor-pointer"
+                        className="flex w-full items-center justify-between gap-2 rounded-xl border border-black/10 bg-white px-3 py-2.5 text-[11px] font-semibold text-black shadow-xs transition-all hover:border-black/20 hover:bg-white cursor-pointer"
                       >
                         <span className="flex items-center gap-1.5 truncate">
                           <Type className="size-3 text-black/60 shrink-0" />
@@ -2028,47 +2144,60 @@ export default function AppPage() {
                             {t[PDF_FONTS.find((f) => f.id === (invoiceData.pdfFont || "plex"))?.labelKey as keyof typeof t] || "IBM Plex Sans"}
                           </span>
                         </span>
-                        <span className="size-1.5 rounded-full bg-[#8ba000] shrink-0" />
+                        <span className="flex items-center gap-1.5">
+                          <span className="size-1.5 shrink-0 rounded-full bg-[#8ba000]" />
+                          <ChevronLeft className="size-3 text-black/28" />
+                        </span>
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent side="left" align="start" className="w-56 p-2 space-y-1 text-xs" sideOffset={10}>
-                      <div className="flex items-center justify-between pb-1.5 border-b border-black/8 px-1">
-                        <span className="text-[10px] font-bold text-black/80">{t.fontSelectorLabel}</span>
-                        <Type className="size-3 text-black/40" />
+                    <PopoverContent side="left" align="center" collisionPadding={16} className="w-72 p-4 text-xs" sideOffset={12}>
+                      <div className="flex items-start justify-between gap-3 border-b border-black/8 pb-3">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#eef7bd] text-[#637500]">
+                            <Type className="size-4" />
+                          </span>
+                          <div>
+                            <p className="text-[12px] font-bold text-black/85">{t.fontSelectorLabel}</p>
+                            <p className="mt-1 text-[10px] leading-4 text-black/42">{language === "tr" ? "PDF belgenizin karakterini belirleyin." : "Choose the character of your PDF document."}</p>
+                          </div>
+                        </div>
+                        <DockPopoverCloseButton language={language} />
                       </div>
-                      <div className="space-y-0.5 max-h-60 overflow-y-auto pr-0.5">
+                      <div className="mt-3 max-h-72 space-y-1 overflow-y-auto pr-0.5">
                         {PDF_FONTS.map((item) => {
                           const isSelected = (invoiceData.pdfFont || "plex") === item.id;
                           return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => {
-                                setInvoiceData({ ...invoiceData, pdfFont: item.id });
-                                toast.success(`${t[item.labelKey as keyof typeof t]} ${language === "tr" ? "yazı tipi seçildi" : "font selected"}`);
-                              }}
-                              className={cn(
-                                "flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-all cursor-pointer",
-                                isSelected
-                                  ? "bg-[#171815] text-white shadow-xs"
-                                  : "hover:bg-black/5 text-black/80"
-                              )}
-                            >
-                              <div className="flex flex-col">
-                                <span className={cn("text-[11px] font-medium leading-tight", item.fontClass)}>
-                                  {t[item.labelKey as keyof typeof t]}
+                            <PopoverClose asChild key={item.id}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInvoiceData({ ...invoiceData, pdfFont: item.id });
+                                  toast.success(`${t[item.labelKey as keyof typeof t]} ${language === "tr" ? "yazı tipi seçildi" : "font selected"}`);
+                                }}
+                                className={cn(
+                                  "flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer",
+                                  isSelected
+                                    ? "border-[#171815] bg-[#171815] text-white shadow-xs"
+                                    : "border-transparent text-black/80 hover:border-black/8 hover:bg-white"
+                                )}
+                              >
+                                <div className="flex flex-col">
+                                  <span className={cn("text-[11px] font-medium leading-tight", item.fontClass)}>
+                                    {t[item.labelKey as keyof typeof t]}
+                                  </span>
+                                  <span className={cn("mt-0.5 text-[8.5px] leading-tight", isSelected ? "text-[#dff568]" : "text-black/40")}>
+                                    {t[item.subKey as keyof typeof t]}
+                                  </span>
+                                </div>
+                                <span className={cn("rounded-lg px-2 py-1 text-sm font-bold", item.fontClass, isSelected ? "bg-white/12 text-white" : "bg-black/5 text-black/40")}>
+                                  {item.sample}
                                 </span>
-                                <span className={cn("text-[8.5px] leading-tight", isSelected ? "text-[#dff568]" : "text-black/40")}>
-                                  {t[item.subKey as keyof typeof t]}
-                                </span>
-                              </div>
-                              <span className={cn("text-xs font-bold px-1.5 py-0.5 rounded", item.fontClass, isSelected ? "text-white bg-white/20" : "text-black/40 bg-black/5")}>
-                                {item.sample}
-                              </span>
-                            </button>
+                              </button>
+                            </PopoverClose>
                           );
                         })}
                       </div>
+                      <p className="mt-3 border-t border-black/8 pt-3 text-[9px] leading-4 text-black/35">{language === "tr" ? "Bir yazı tipi seçtiğinizde panel otomatik kapanır." : "This panel closes automatically after you select a font."}</p>
                     </PopoverContent>
                   </Popover>
                 </div>
