@@ -5,6 +5,23 @@ import { toast } from "sonner";
 
 export const DEFAULT_COMPANY_LOGO = "";
 export const DEFAULT_CLIENT_LOGO = "https://images.pexels.com/photos/19023561/pexels-photo-19023561.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
+const LEGACY_DEFAULT_NOTE = "Bizi tercih ettiğiniz için teşekkür ederiz.";
+const DOCUMENT_TITLE_TRANSLATIONS: Record<Language, Record<string, string>> = {
+  tr: {
+    "SERVICE SUMMARY": "HİZMET ÖZETİ",
+    "PRICE QUOTE": "FİYAT TEKLİFİ",
+    "PROFORMA INVOICE": "PROFORMA FATURA",
+    "PROJECT PROPOSAL": "PROJE TEKLİFİ",
+    "SUBSCRIPTION QUOTE": "ABONELİK & HİZMET TEKLİFİ",
+  },
+  en: {
+    "HİZMET ÖZETİ": "SERVICE SUMMARY",
+    "FİYAT TEKLİFİ": "PRICE QUOTE",
+    "PROFORMA FATURA": "PROFORMA INVOICE",
+    "PROJE TEKLİFİ": "PROJECT PROPOSAL",
+    "ABONELİK & HİZMET TEKLİFİ": "SUBSCRIPTION QUOTE",
+  },
+};
 
 export const getDefaultTaxes = (lang: Language): CustomTax[] => [
   { id: "tax-0", name: lang === "en" ? "VAT" : "KDV", rate: 0 },
@@ -29,7 +46,7 @@ const emptyInvoiceData: InvoiceData = {
   title: "",
   clientName: "Ahmet Yılmaz",
   date: getInitialDate(),
-  notes: "Bizi tercih ettiğiniz için teşekkür ederiz.",
+  notes: "",
   kdvRate: 0,
   taxName: "KDV",
   taxId: "tax-0",
@@ -119,6 +136,7 @@ export function useInvoiceState() {
           setInvoiceData((prev) => ({
             ...prev,
             ...parsed,
+            notes: parsed.notes === LEGACY_DEFAULT_NOTE ? "" : (parsed.notes ?? prev.notes),
           }));
         }
       } catch (e) {
@@ -248,6 +266,7 @@ export function useInvoiceState() {
       return {
         ...prev,
         taxName: isDefaultTax ? (lang === "en" ? "VAT" : "KDV") : prev.taxName,
+        title: prev.title ? (DOCUMENT_TITLE_TRANSLATIONS[lang][prev.title] ?? prev.title) : prev.title,
       };
     });
   };
