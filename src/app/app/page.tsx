@@ -183,50 +183,143 @@ export default function AppPage() {
     const element = printRef.current;
     if (!element) return;
 
-    const html2canvas = (await import("html2canvas")).default;
-    const { jsPDF } = await import("jspdf");
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { jsPDF } = await import("jspdf");
 
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      onclone: (clonedDoc) => {
-        const pdfContainer = clonedDoc.querySelector('.pdf-container');
-        if (pdfContainer) {
-          pdfContainer.classList.add('pdf-export');
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        onclone: (clonedDoc) => {
+          const pdfContainer = clonedDoc.querySelector('.pdf-container');
+          if (pdfContainer) {
+            pdfContainer.classList.add('pdf-export');
+          }
+          const previewTransform = clonedDoc.querySelector<HTMLElement>('.pdf-preview-transform');
+          if (previewTransform) {
+            previewTransform.style.transform = 'none';
+            previewTransform.style.transition = 'none';
+          }
+
+          // html2canvas does not support modern color functions (lab, oklab, lch, oklch, color, color-mix)
+          // 1. Sanitize stylesheets in clonedDoc to delete modern color @supports rules
+          try {
+            const sheets = Array.from(clonedDoc.styleSheets);
+            for (const sheet of sheets) {
+              try {
+                const rules = Array.from(sheet.cssRules || []);
+                for (let i = rules.length - 1; i >= 0; i--) {
+                  const rule = rules[i];
+                  if (rule.cssText && /(?:lab|oklab|lch|oklch)\s*\(/i.test(rule.cssText)) {
+                    sheet.deleteRule(i);
+                  }
+                }
+              } catch {
+                // Ignore cross-origin stylesheet errors if any
+              }
+            }
+
+            clonedDoc.querySelectorAll('style').forEach((style) => {
+              if (style.textContent && /(?:lab|oklab|lch|oklch)\s*\(/i.test(style.textContent)) {
+                style.textContent = style.textContent.replace(
+                  /@supports\s*\(\s*color\s*:\s*(?:lab|oklab|oklch|lch)[^)]*\)\s*\{[\s\S]*?\}\s*\}/gi,
+                  ''
+                );
+              }
+            });
+          } catch (e) {
+            console.warn("Stylesheet sanitization warning:", e);
+          }
+
+          // 2. Convert all modern color computed styles on all elements to standard rgb/rgba
+          try {
+            const helperCanvas = clonedDoc.createElement('canvas');
+            helperCanvas.width = 1;
+            helperCanvas.height = 1;
+            const helperCtx = helperCanvas.getContext('2d');
+
+            const isModernColor = (str: string) => {
+              return Boolean(str && /(?:lab|oklab|lch|oklch|color-mix|color)\s*\(/i.test(str));
+            };
+
+            const sanitizeColor = (val: string) => {
+              if (!isModernColor(val)) return val;
+              if (helperCtx) {
+                try {
+                  helperCtx.fillStyle = '#000000';
+                  helperCtx.fillStyle = val;
+                  return helperCtx.fillStyle;
+                } catch {
+                  return '#000000';
+                }
+              }
+              return val;
+            };
+
+            const colorProps = [
+              'color',
+              'backgroundColor',
+              'borderColor',
+              'borderTopColor',
+              'borderRightColor',
+              'borderBottomColor',
+              'borderLeftColor',
+              'outlineColor',
+              'textDecorationColor',
+              'fill',
+              'stroke',
+            ] as const;
+
+            const elements = clonedDoc.querySelectorAll<HTMLElement | SVGElement>('*');
+            elements.forEach((el) => {
+              const computed = window.getComputedStyle(el);
+              for (const prop of colorProps) {
+                const val = (computed as unknown as Record<string, string>)[prop];
+                if (isModernColor(val)) {
+                  el.style.setProperty(
+                    prop.replace(/([A-Z])/g, '-$1').toLowerCase(),
+                    sanitizeColor(val),
+                    'important'
+                  );
+                }
+              }
+            });
+          } catch (e) {
+            console.warn("Color sanitization warning:", e);
+          }
         }
-        const previewTransform = clonedDoc.querySelector<HTMLElement>('.pdf-preview-transform');
-        if (previewTransform) {
-          previewTransform.style.transform = 'none';
-          previewTransform.style.transition = 'none';
+      });
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      // Force single page fit
+      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+
+      const clientSlug = createSlug(invoiceData.clientName);
+      const fileName = clientSlug ? `teklif-${clientSlug}.pdf` : `teklif.pdf`;
+
+      pdf.save(fileName);
+      toast.success(language === "tr" ? "PDF başarıyla indirildi" : "PDF downloaded successfully");
+
+      setTimeout(() => {
+        const hasSeen = sessionStorage.getItem("hasSeenSupportModal");
+        if (!hasSeen) {
+          setShowSupportModal(true);
+          sessionStorage.setItem("hasSeenSupportModal", "true");
         }
-      }
-    });
-    const imgData = canvas.toDataURL("image/jpeg", 0.98);
-
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-
-    // Force single page fit
-    pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
-
-    const clientSlug = createSlug(invoiceData.clientName);
-    const fileName = clientSlug ? `teklif-${clientSlug}.pdf` : `teklif.pdf`;
-
-    pdf.save(fileName);
-
-    setTimeout(() => {
-      const hasSeen = sessionStorage.getItem("hasSeenSupportModal");
-      if (!hasSeen) {
-        setShowSupportModal(true);
-        sessionStorage.setItem("hasSeenSupportModal", "true");
-      }
-    }, 1500);
+      }, 1500);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error(language === "tr" ? "PDF oluşturulurken bir hata oluştu" : "Failed to generate PDF");
+    }
   };
 
   const handleCreateProfile = () => {
@@ -1325,19 +1418,19 @@ export default function AppPage() {
                   </div>
                   {/* Due Date or Validity badge */}
                   {invoiceData.showDueDate && invoiceData.dueDate && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-[#f5f3ee] px-3 py-1 text-[11px] text-black/70 font-medium">
-                      <CalendarClock className="size-3 text-black/50" />
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#e3e2dc] bg-[#f5f3ee] px-3 py-1 text-[11px] text-[#4c4c4c] font-medium">
+                      <CalendarClock className="size-3 text-[#7f7f7f]" />
                       <span>{t.dueDatePrefix}: {invoiceData.dueDate}</span>
                     </div>
                   )}
                   {invoiceData.billingType === "subscription" && (invoiceData.periodStart || invoiceData.periodEnd) && (
-                    <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-black/10 bg-[#f5f3ee] px-4 py-1.5 text-xs text-primary font-medium">
+                    <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#e3e2dc] bg-[#f5f3ee] px-4 py-1.5 text-xs text-primary font-medium">
                       <span className="size-1.5 rounded-full bg-[#8ba000]" />
                       <span>
                         {t.billingPeriodLabel}: {invoiceData.periodStart || invoiceData.date} – {invoiceData.periodEnd || getFutureDate(12)}
                       </span>
                       {invoiceData.autoRenewal && (
-                        <span className="rounded-full bg-black/6 px-2 py-0.5 text-[10px] font-semibold text-black/60">
+                        <span className="rounded-full bg-[#eceae4] px-2 py-0.5 text-[10px] font-semibold text-[#666666]">
                           {t.autoRenewalLabel}
                         </span>
                       )}
@@ -1434,20 +1527,20 @@ export default function AppPage() {
 
                   {/* Bank & Payment Information Card on PDF */}
                   {invoiceData.showPaymentInfo && (invoiceData.bankName || invoiceData.iban || invoiceData.accountHolder) && (
-                    <div className="mt-6 rounded-xl border border-black/8 bg-[#fbfaf7] p-3.5 text-xs">
+                    <div className="mt-6 rounded-xl border border-[#eceae4] bg-[#fbfaf7] p-3.5 text-xs">
                       <p className="font-semibold text-primary text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <Building2 className="size-3 text-black/60" />
+                        <Building2 className="size-3 text-[#666666]" />
                         {t.paymentInfoTitle}
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-black/75">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[#404040]">
                         {invoiceData.bankName && (
-                          <div><span className="font-medium text-black/45">{t.bankNameLabel}: </span><span className="font-medium">{invoiceData.bankName}</span></div>
+                          <div><span className="font-medium text-[#8c8c8c]">{t.bankNameLabel}: </span><span className="font-medium">{invoiceData.bankName}</span></div>
                         )}
                         {invoiceData.accountHolder && (
-                          <div><span className="font-medium text-black/45">{t.accountHolderLabel}: </span><span className="font-medium">{invoiceData.accountHolder}</span></div>
+                          <div><span className="font-medium text-[#8c8c8c]">{t.accountHolderLabel}: </span><span className="font-medium">{invoiceData.accountHolder}</span></div>
                         )}
                         {invoiceData.iban && (
-                          <div className="col-span-full font-mono text-[11px]"><span className="font-medium text-black/45 font-sans">{t.ibanLabel}: </span><span className="font-semibold">{invoiceData.iban}</span></div>
+                          <div className="col-span-full font-mono text-[11px]"><span className="font-medium text-[#8c8c8c] font-sans">{t.ibanLabel}: </span><span className="font-semibold">{invoiceData.iban}</span></div>
                         )}
                       </div>
                     </div>
@@ -1455,18 +1548,18 @@ export default function AppPage() {
 
                   {/* Notes & Terms on PDF */}
                   {invoiceData.showNotes !== false && invoiceData.notes && (
-                    <div className="mt-4 rounded-xl border border-black/6 bg-[#fbfaf7] p-4 text-xs text-muted-foreground">
+                    <div className="mt-4 rounded-xl border border-[#eeebe5] bg-[#fbfaf7] p-4 text-xs text-muted-foreground">
                       <p className="font-semibold text-primary text-[10px] uppercase tracking-wider mb-1">
                         {language === "tr" ? "Notlar ve Şartlar" : "Notes & Terms"}
                       </p>
-                      <p className="whitespace-pre-wrap leading-relaxed text-black/70">{invoiceData.notes}</p>
+                      <p className="whitespace-pre-wrap leading-relaxed text-[#4c4c4c]">{invoiceData.notes}</p>
                     </div>
                   )}
 
                   {/* Signature & Stamp Area on PDF */}
                   {invoiceData.showSignature && (
                     <div className="mt-8 flex justify-end">
-                      <div className="w-56 text-center border-t border-black/40 pt-2">
+                      <div className="w-56 text-center border-t border-[#999999] pt-2">
                         <p className="text-xs font-semibold text-primary">
                           {invoiceData.signatureTitle || t.signatureLineText}
                         </p>

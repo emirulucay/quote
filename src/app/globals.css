@@ -68,6 +68,11 @@
 }
 
 /* PDF Export Overrides for html2canvas alignment bugs */
+.pdf-export,
+.pdf-export * {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
 .pdf-export th {
   padding-top: 0.5rem !important;
   padding-bottom: 1rem !important;
