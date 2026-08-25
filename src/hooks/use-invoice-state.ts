@@ -67,6 +67,7 @@ const emptyInvoiceData: InvoiceData = {
   showDueDate: false,
   dueDate: getFutureDate(1),
   pdfFont: "plex",
+  pdfLayout: "modern",
 };
 
 export function useInvoiceState() {
@@ -199,6 +200,7 @@ export function useInvoiceState() {
       const persistentPreferences = {
         title: invoiceData.title,
         pdfFont: invoiceData.pdfFont,
+        pdfLayout: invoiceData.pdfLayout,
         billingType: invoiceData.billingType,
         billingCycle: invoiceData.billingCycle,
         autoRenewal: invoiceData.autoRenewal,

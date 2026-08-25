@@ -4,6 +4,7 @@ export type ServicesLayout = "inline" | "tabs";
 export type BillingType = "one-time" | "subscription";
 export type BillingCycle = "monthly" | "yearly" | "quarterly";
 export type PdfFont = "plex" | "geist" | "inter" | "jakarta" | "space" | "playfair" | "lora";
+export type PdfLayout = "modern" | "corporate" | "creative" | "dark";
 
 export type { Language, Currency };
 
@@ -54,4 +55,5 @@ export interface InvoiceData {
   showDueDate?: boolean;
   dueDate?: string;
   pdfFont?: PdfFont;
+  pdfLayout?: PdfLayout;
 }

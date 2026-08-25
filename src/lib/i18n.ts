@@ -198,6 +198,18 @@ export const TRANSLATIONS = {
     fontPlayfairSub: "Lüks Serif",
     fontLora: "Lora",
     fontLoraSub: "Klasik Serif",
+
+    // Layout Options
+    layoutSelectorLabel: "PDF Şablonu",
+    layoutSelectorDesc: "PDF belgenizin görsel düzenini ve temasını seçin.",
+    layoutModern: "Modern Minimal",
+    layoutModernSub: "Ferah & Ortalanmış",
+    layoutCorporate: "Kurumsal Klasik",
+    layoutCorporateSub: "Yapılandırılmış & Çizgili",
+    layoutCreative: "Kreatif & Vurgulu",
+    layoutCreativeSub: "Sol Şerit & Asimetrik",
+    layoutDark: "Dark Mode (Obsidyen)",
+    layoutDarkSub: "Koyu Zemin & Yüksek Kontrast",
   },
   en: {
     // Onboarding
@@ -381,5 +393,17 @@ export const TRANSLATIONS = {
     fontPlayfairSub: "Luxury Serif",
     fontLora: "Lora",
     fontLoraSub: "Classic Serif",
+
+    // Layout Options
+    layoutSelectorLabel: "PDF Layout",
+    layoutSelectorDesc: "Choose the visual template and theme for your PDF.",
+    layoutModern: "Modern Minimal",
+    layoutModernSub: "Spacious & Centered",
+    layoutCorporate: "Corporate Classic",
+    layoutCorporateSub: "Structured & Bordered",
+    layoutCreative: "Creative & Accent",
+    layoutCreativeSub: "Left Accent & Asymmetric",
+    layoutDark: "Dark Mode (Obsidian)",
+    layoutDarkSub: "Deep Dark Theme",
   },
 };
