@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, Download, Upload, X, Coffee, Heart, Globe, Coins, ArrowLeft, ArrowRight, Check, ShieldCheck, Pencil, LayoutList, Columns2, Sparkles, RefreshCw, Building2, Percent, PenTool, CalendarClock, FileText, Type, ChevronLeft } from "lucide-react";
+import { Trash2, Plus, Minus, Download, Upload, X, Coffee, Heart, Globe, Coins, ArrowLeft, ArrowRight, Check, ShieldCheck, Pencil, LayoutList, Columns2, Sparkles, RefreshCw, Building2, Percent, PenTool, CalendarClock, FileText, Type, ChevronLeft, ChevronDown, LayoutTemplate } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { DEFAULT_COMPANY_LOGO } from "@/hooks/use-invoice-state";
@@ -25,7 +25,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CURRENCIES, Language, Currency } from "@/lib/i18n";
-import { ServicesLayout, BillingType, BillingCycle, PdfFont } from "@/types";
+import { ServicesLayout, PdfFont, PdfLayout } from "@/types";
+import { PdfDocumentRenderer } from "@/components/pdf-layouts";
 
 const getPdfFontClass = (font?: PdfFont) => {
   switch (font) {
@@ -46,6 +47,19 @@ const getPdfFontClass = (font?: PdfFont) => {
       return "font-pdf-plex";
   }
 };
+
+const PDF_LAYOUTS: {
+  id: PdfLayout;
+  labelKey: string;
+  subKey: string;
+  badge: string;
+  themeColor: string;
+}[] = [
+  { id: "modern", labelKey: "layoutModern", subKey: "layoutModernSub", badge: "Default", themeColor: "bg-[#171815] text-white" },
+  { id: "corporate", labelKey: "layoutCorporate", subKey: "layoutCorporateSub", badge: "Classic", themeColor: "bg-[#2563eb] text-white" },
+  { id: "creative", labelKey: "layoutCreative", subKey: "layoutCreativeSub", badge: "Accent", themeColor: "bg-[#8ba000] text-black" },
+  { id: "dark", labelKey: "layoutDark", subKey: "layoutDarkSub", badge: "Dark", themeColor: "bg-[#141512] text-[#dff568] border border-white/20" },
+];
 
 const PDF_FONTS: { id: PdfFont; labelKey: string; subKey: string; fontClass: string; sample: string }[] = [
   { id: "plex", labelKey: "fontPlex", subKey: "fontPlexSub", fontClass: "font-pdf-plex", sample: "Aa" },
@@ -184,112 +198,17 @@ export default function AppPage() {
     if (!element) return;
 
     try {
-      const html2canvas = (await import("html2canvas")).default;
+      const { toJpeg } = await import("html-to-image");
       const { jsPDF } = await import("jspdf");
 
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        onclone: (clonedDoc) => {
-          const pdfContainer = clonedDoc.querySelector('.pdf-container');
-          if (pdfContainer) {
-            pdfContainer.classList.add('pdf-export');
-          }
-          const previewTransform = clonedDoc.querySelector<HTMLElement>('.pdf-preview-transform');
-          if (previewTransform) {
-            previewTransform.style.transform = 'none';
-            previewTransform.style.transition = 'none';
-          }
+      const isDark = invoiceData.pdfLayout === "dark";
 
-          // html2canvas does not support modern color functions (lab, oklab, lch, oklch, color, color-mix)
-          // 1. Sanitize stylesheets in clonedDoc to delete modern color @supports rules
-          try {
-            const sheets = Array.from(clonedDoc.styleSheets);
-            for (const sheet of sheets) {
-              try {
-                const rules = Array.from(sheet.cssRules || []);
-                for (let i = rules.length - 1; i >= 0; i--) {
-                  const rule = rules[i];
-                  if (rule.cssText && /(?:lab|oklab|lch|oklch)\s*\(/i.test(rule.cssText)) {
-                    sheet.deleteRule(i);
-                  }
-                }
-              } catch {
-                // Ignore cross-origin stylesheet errors if any
-              }
-            }
-
-            clonedDoc.querySelectorAll('style').forEach((style) => {
-              if (style.textContent && /(?:lab|oklab|lch|oklch)\s*\(/i.test(style.textContent)) {
-                style.textContent = style.textContent.replace(
-                  /@supports\s*\(\s*color\s*:\s*(?:lab|oklab|oklch|lch)[^)]*\)\s*\{[\s\S]*?\}\s*\}/gi,
-                  ''
-                );
-              }
-            });
-          } catch (e) {
-            console.warn("Stylesheet sanitization warning:", e);
-          }
-
-          // 2. Convert all modern color computed styles on all elements to standard rgb/rgba
-          try {
-            const helperCanvas = clonedDoc.createElement('canvas');
-            helperCanvas.width = 1;
-            helperCanvas.height = 1;
-            const helperCtx = helperCanvas.getContext('2d');
-
-            const isModernColor = (str: string) => {
-              return Boolean(str && /(?:lab|oklab|lch|oklch|color-mix|color)\s*\(/i.test(str));
-            };
-
-            const sanitizeColor = (val: string) => {
-              if (!isModernColor(val)) return val;
-              if (helperCtx) {
-                try {
-                  helperCtx.fillStyle = '#000000';
-                  helperCtx.fillStyle = val;
-                  return helperCtx.fillStyle;
-                } catch {
-                  return '#000000';
-                }
-              }
-              return val;
-            };
-
-            const colorProps = [
-              'color',
-              'backgroundColor',
-              'borderColor',
-              'borderTopColor',
-              'borderRightColor',
-              'borderBottomColor',
-              'borderLeftColor',
-              'outlineColor',
-              'textDecorationColor',
-              'fill',
-              'stroke',
-            ] as const;
-
-            const elements = clonedDoc.querySelectorAll<HTMLElement | SVGElement>('*');
-            elements.forEach((el) => {
-              const computed = window.getComputedStyle(el);
-              for (const prop of colorProps) {
-                const val = (computed as unknown as Record<string, string>)[prop];
-                if (isModernColor(val)) {
-                  el.style.setProperty(
-                    prop.replace(/([A-Z])/g, '-$1').toLowerCase(),
-                    sanitizeColor(val),
-                    'important'
-                  );
-                }
-              }
-            });
-          } catch (e) {
-            console.warn("Color sanitization warning:", e);
-          }
-        }
+      const imgData = await toJpeg(element, {
+        quality: 0.98,
+        pixelRatio: 2,
+        backgroundColor: isDark ? "#141512" : "#ffffff",
+        cacheBust: true,
       });
-      const imgData = canvas.toDataURL("image/jpeg", 0.98);
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -1356,6 +1275,55 @@ export default function AppPage() {
                     <Plus className="size-3.5" />
                   </button>
                 </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-black/8 bg-white/75 px-3 py-1.5 text-[9px] font-semibold text-black/70 shadow-[0_4px_14px_rgba(20,21,18,0.04)] hover:bg-white hover:border-black/15 transition-all cursor-pointer"
+                      title={language === "tr" ? "PDF Şablonu" : "PDF Layout"}
+                    >
+                      <LayoutTemplate className="size-3 text-black/55" />
+                      <span>{t[PDF_LAYOUTS.find((l) => l.id === (invoiceData.pdfLayout || "modern"))?.labelKey as keyof typeof t] || "Modern"}</span>
+                      <ChevronDown className="size-2.5 text-black/35" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="center" className="w-72 p-3 text-xs" sideOffset={8}>
+                    <div className="flex items-center justify-between border-b border-black/8 pb-2">
+                      <span className="text-[11px] font-bold text-black/85">{t.layoutSelectorLabel}</span>
+                      <span className="text-[9px] text-black/40">{t.layoutSelectorDesc}</span>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      {PDF_LAYOUTS.map((item) => {
+                        const isSelected = (invoiceData.pdfLayout || "modern") === item.id;
+                        return (
+                          <PopoverClose asChild key={item.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setInvoiceData({ ...invoiceData, pdfLayout: item.id });
+                                toast.success(`${t[item.labelKey as keyof typeof t]} ${language === "tr" ? "şablonu seçildi" : "layout selected"}`);
+                              }}
+                              className={cn(
+                                "flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left transition-all cursor-pointer",
+                                isSelected ? "bg-[#171815] text-white shadow-xs" : "hover:bg-black/5 text-black/80"
+                              )}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={cn("flex size-5 shrink-0 items-center justify-center rounded text-[8px] font-bold shadow-2xs", item.themeColor)}>
+                                  {item.id === "dark" ? "◐" : item.id === "creative" ? "✦" : item.id === "corporate" ? "☷" : "◻"}
+                                </div>
+                                <span className="text-[10.5px] font-semibold">{t[item.labelKey as keyof typeof t]}</span>
+                              </div>
+                              <span className={cn("text-[8px] font-bold px-1.5 py-0.5 rounded", isSelected ? "bg-white/15 text-white" : "bg-black/5 text-black/40")}>
+                                {item.badge}
+                              </span>
+                            </button>
+                          </PopoverClose>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 <span className="hidden rounded-full border border-black/8 bg-white/55 px-3 py-1.5 font-mono text-[9px] font-semibold tracking-wide text-black/45 sm:inline-flex">
                   A4 · PDF
                 </span>
@@ -1391,194 +1359,28 @@ export default function AppPage() {
                     <div
                       ref={printRef}
                       className={cn(
-                        "pdf-container flex w-full flex-col justify-start overflow-hidden bg-white p-16 shadow-[0_28px_80px_-20px_rgba(20,21,18,0.28),0_2px_8px_rgba(20,21,18,0.08)] transition-all",
+                        "pdf-container flex w-full flex-col justify-start overflow-hidden p-16 shadow-[0_28px_80px_-20px_rgba(20,21,18,0.28),0_2px_8px_rgba(20,21,18,0.08)] transition-all",
+                        invoiceData.pdfLayout === "dark" ? "bg-[#141512] text-[#f5f4ef]" : "bg-white text-[#171815]",
                         getPdfFontClass(invoiceData.pdfFont)
                       )}
                       style={{ aspectRatio: "1/1.414" }}
                     >
-                {/* Centered Title */}
-                <div className="text-center mb-10 mt-6">
-                  <h1 lang="en" className="text-2xl font-bold uppercase tracking-widest text-primary mb-2">
-                    {invoiceData.title?.trim() || (invoiceData.billingType === "subscription" ? t.subscriptionDocumentTitle : t.documentTitle)}
-                  </h1>
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground font-mono">
-                    <span>{invoiceData.date}</span>
-                    {invoiceData.billingType === "subscription" && (
-                      <>
-                        <span>•</span>
-                        <span className="font-semibold text-primary">
-                          {invoiceData.billingCycle === "monthly"
-                            ? t.cycleMonthlyBadge
-                            : invoiceData.billingCycle === "quarterly"
-                            ? t.cycleQuarterlyBadge
-                            : t.cycleYearlyBadge}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {/* Due Date or Validity badge */}
-                  {invoiceData.showDueDate && invoiceData.dueDate && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#e3e2dc] bg-[#f5f3ee] px-3 py-1 text-[11px] text-[#4c4c4c] font-medium">
-                      <CalendarClock className="size-3 text-[#7f7f7f]" />
-                      <span>{t.dueDatePrefix}: {invoiceData.dueDate}</span>
-                    </div>
-                  )}
-                  {invoiceData.billingType === "subscription" && (invoiceData.periodStart || invoiceData.periodEnd) && (
-                    <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#e3e2dc] bg-[#f5f3ee] px-4 py-1.5 text-xs text-primary font-medium">
-                      <span className="size-1.5 rounded-full bg-[#8ba000]" />
-                      <span>
-                        {t.billingPeriodLabel}: {invoiceData.periodStart || invoiceData.date} – {invoiceData.periodEnd || getFutureDate(12)}
-                      </span>
-                      {invoiceData.autoRenewal && (
-                        <span className="rounded-full bg-[#eceae4] px-2 py-0.5 text-[10px] font-semibold text-[#666666]">
-                          {t.autoRenewalLabel}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Client Info */}
-                <div className="mb-14 text-center">
-                  <h3 lang="en" className="text-sm font-bold uppercase text-muted-foreground mb-2">{t.clientHeader}</h3>
-                  <p className="text-2xl font-medium">{invoiceData.clientName}</p>
-                </div>
-
-                {/* Table */}
-                <div className="flex-1">
-                  <table className="w-full text-sm mt-2">
-                    <thead>
-                      <tr lang="en" className="border-b-2 border-primary text-primary font-bold uppercase">
-                        <th className="py-3 text-left w-1/2 font-bold">{t.thService}</th>
-                        <th className="py-3 text-center w-1/6 font-bold">{t.thQuantity}</th>
-                        <th className="py-3 text-right w-1/6 font-bold">{t.thPrice}</th>
-                        <th className="py-3 text-right w-1/6 font-bold">{t.thTotal}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lineItems.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="py-8 text-center text-muted-foreground">
-                            {t.noServicesAdded}
-                          </td>
-                        </tr>
-                      ) : (
-                        lineItems.map((item) => (
-                          <tr key={item.id} className="border-b border-border">
-                            <td className="py-4 wrap-break-word pr-3 align-middle" title={item.name || t.unnamedService}>
-                              <span className="font-medium">{item.name || t.unnamedService}</span>
-                              {item.description && <span className="mt-1 block text-xs font-normal leading-5 text-muted-foreground">{item.description}</span>}
-                            </td>
-                            <td className="py-4 text-center font-mono align-middle">{item.quantity}</td>
-                            <td className="py-4 text-right font-geist tabular-nums align-middle">{formatCurrency(Number(item.price) || 0, currency)}</td>
-                            <td className="py-4 text-right font-geist tabular-nums font-bold text-primary align-middle">
-                              {formatCurrency((Number(item.quantity) || 0) * (Number(item.price) || 0), currency)}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-
-                  {/* Totals Calculation Box */}
-                  <div className="flex justify-end mt-8">
-                    <div className="w-1/2 flex flex-col gap-1.5">
-                      {(invoiceData.kdvRate > 0 || (invoiceData.showDiscount && discountRate > 0)) && (
-                        <div className="flex justify-between py-1.5 text-muted-foreground text-sm">
-                          <span className="font-medium">{t.subtotalLabel}</span>
-                          <span className="font-geist tabular-nums">{formatCurrency(subtotal, currency)}</span>
-                        </div>
-                      )}
-                      {invoiceData.showDiscount && discountRate > 0 && (
-                        <div className="flex justify-between py-1.5 text-red-600 text-sm">
-                          <span className="font-medium">{t.discountBadgeLabel} (%{discountRate})</span>
-                          <span className="font-geist tabular-nums font-medium">-{formatCurrency(discountAmount, currency)}</span>
-                        </div>
-                      )}
-                      {invoiceData.kdvRate > 0 && (
-                        <div className="flex justify-between py-1.5 text-muted-foreground text-sm">
-                          <span className="font-medium">
-                            {(!invoiceData.taxId || invoiceData.taxId.startsWith("tax-") || invoiceData.taxName === "KDV" || invoiceData.taxName === "VAT" || invoiceData.taxName === "VAT / Tax")
-                              ? t.kdvTaxLabel
-                              : invoiceData.taxName} (%{invoiceData.kdvRate})
-                          </span>
-                          <span className="font-geist tabular-nums">{formatCurrency(kdvAmount, currency)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between items-baseline py-3 border-t-2 border-primary">
-                        <span className="font-bold text-lg uppercase tracking-tight">{t.totalLabel}</span>
-                        <div className="text-right">
-                          <span className="font-geist tabular-nums font-bold text-2xl text-primary">
-                            {formatCurrency(total, currency)}
-                          </span>
-                          {invoiceData.billingType === "subscription" && (
-                            <span className="ml-1.5 font-geist font-semibold text-sm text-muted-foreground">
-                              {invoiceData.billingCycle === "monthly"
-                                ? t.perMonth
-                                : invoiceData.billingCycle === "quarterly"
-                                ? t.perQuarter
-                                : t.perYear}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bank & Payment Information Card on PDF */}
-                  {invoiceData.showPaymentInfo && (invoiceData.bankName || invoiceData.iban || invoiceData.accountHolder) && (
-                    <div className="mt-6 rounded-xl border border-[#eceae4] bg-[#fbfaf7] p-3.5 text-xs">
-                      <p className="font-semibold text-primary text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <Building2 className="size-3 text-[#666666]" />
-                        {t.paymentInfoTitle}
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[#404040]">
-                        {invoiceData.bankName && (
-                          <div><span className="font-medium text-[#8c8c8c]">{t.bankNameLabel}: </span><span className="font-medium">{invoiceData.bankName}</span></div>
-                        )}
-                        {invoiceData.accountHolder && (
-                          <div><span className="font-medium text-[#8c8c8c]">{t.accountHolderLabel}: </span><span className="font-medium">{invoiceData.accountHolder}</span></div>
-                        )}
-                        {invoiceData.iban && (
-                          <div className="col-span-full font-mono text-[11px]"><span className="font-medium text-[#8c8c8c] font-sans">{t.ibanLabel}: </span><span className="font-semibold">{invoiceData.iban}</span></div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Notes & Terms on PDF */}
-                  {invoiceData.showNotes !== false && invoiceData.notes && (
-                    <div className="mt-4 rounded-xl border border-[#eeebe5] bg-[#fbfaf7] p-4 text-xs text-muted-foreground">
-                      <p className="font-semibold text-primary text-[10px] uppercase tracking-wider mb-1">
-                        {language === "tr" ? "Notlar ve Şartlar" : "Notes & Terms"}
-                      </p>
-                      <p className="whitespace-pre-wrap leading-relaxed text-[#4c4c4c]">{invoiceData.notes}</p>
-                    </div>
-                  )}
-
-                  {/* Signature & Stamp Area on PDF */}
-                  {invoiceData.showSignature && (
-                    <div className="mt-8 flex justify-end">
-                      <div className="w-56 text-center border-t border-[#999999] pt-2">
-                        <p className="text-xs font-semibold text-primary">
-                          {invoiceData.signatureTitle || t.signatureLineText}
-                        </p>
-                        <p className="text-[9px] text-muted-foreground mt-0.5">{invoiceData.date}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer (Logo & Freelancer Info) */}
-                <div className="mt-auto pt-12 flex flex-col items-center text-center gap-4">
-                  {activeProfile.logoBase64 && (
-                    <Image src={activeProfile.logoBase64} alt="Company Logo" width={200} height={64} className="h-16 w-auto object-contain max-w-50" />
-                  )}
-                  <div className="flex flex-col">
-                    <p className="font-bold text-lg">{activeProfile.companyName}</p>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{activeProfile.contactInfo}</p>
-                  </div>
-                </div>
+                      <PdfDocumentRenderer
+                        invoiceData={invoiceData}
+                        activeProfile={activeProfile}
+                        lineItems={lineItems}
+                        currency={currency}
+                        language={language}
+                        t={t}
+                        subtotal={subtotal}
+                        discountRate={discountRate}
+                        discountAmount={discountAmount}
+                        taxableBase={taxableBase}
+                        kdvAmount={kdvAmount}
+                        total={total}
+                        formatCurrency={formatCurrency}
+                        getFutureDate={getFutureDate}
+                      />
                     </div>
                   </div>
                 </div>
@@ -2220,7 +2022,91 @@ export default function AppPage() {
 
                 <div className="mx-1 h-px bg-black/7" />
 
-                {/* Section 4: PDF Font Selector */}
+                {/* Section 4: PDF Layout Selector */}
+                <div className="flex flex-col gap-1.5 px-0.5 pb-0.5">
+                  <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-[0.14em] text-black/35">
+                    {t.layoutSelectorLabel}
+                  </span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-2 rounded-xl border border-black/10 bg-white px-3 py-2.5 text-[11px] font-semibold text-black shadow-xs transition-all hover:border-black/20 hover:bg-white cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5 truncate">
+                          <LayoutTemplate className="size-3 text-black/60 shrink-0" />
+                          <span className="truncate">
+                            {t[PDF_LAYOUTS.find((l) => l.id === (invoiceData.pdfLayout || "modern"))?.labelKey as keyof typeof t] || "Modern Minimal"}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="size-1.5 shrink-0 rounded-full bg-[#8ba000]" />
+                          <ChevronLeft className="size-3 text-black/28" />
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="left" align="center" collisionPadding={16} className="w-80 p-4 text-xs" sideOffset={12}>
+                      <div className="flex items-start justify-between gap-3 border-b border-black/8 pb-3">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#eef7bd] text-[#637500]">
+                            <LayoutTemplate className="size-4" />
+                          </span>
+                          <div>
+                            <p className="text-[12px] font-bold text-black/85">{t.layoutSelectorLabel}</p>
+                            <p className="mt-1 text-[10px] leading-4 text-black/42">{t.layoutSelectorDesc}</p>
+                          </div>
+                        </div>
+                        <DockPopoverCloseButton language={language} />
+                      </div>
+                      <div className="mt-3 space-y-1.5 pr-0.5">
+                        {PDF_LAYOUTS.map((item) => {
+                          const isSelected = (invoiceData.pdfLayout || "modern") === item.id;
+                          return (
+                            <PopoverClose asChild key={item.id}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInvoiceData({ ...invoiceData, pdfLayout: item.id });
+                                  toast.success(`${t[item.labelKey as keyof typeof t]} ${language === "tr" ? "şablonu seçildi" : "layout selected"}`);
+                                }}
+                                className={cn(
+                                  "flex w-full items-center justify-between rounded-xl border p-2.5 text-left transition-all cursor-pointer",
+                                  isSelected
+                                    ? "border-[#171815] bg-[#171815] text-white shadow-xs"
+                                    : "border-transparent text-black/80 hover:border-black/8 hover:bg-white"
+                                )}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg font-mono text-[9px] font-bold shadow-2xs", item.themeColor)}>
+                                    {item.id === "dark" ? "◐" : item.id === "creative" ? "✦" : item.id === "corporate" ? "☷" : "◻"}
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-[11px] font-semibold leading-tight truncate">
+                                      {t[item.labelKey as keyof typeof t]}
+                                    </span>
+                                    <span className={cn("mt-0.5 text-[8.5px] leading-tight truncate", isSelected ? "text-[#dff568]" : "text-black/40")}>
+                                      {t[item.subKey as keyof typeof t]}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className={cn("rounded-md px-2 py-0.5 text-[9px] font-bold shrink-0", isSelected ? "bg-white/15 text-white" : "bg-black/5 text-black/40")}>
+                                  {item.badge}
+                                </span>
+                              </button>
+                            </PopoverClose>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-3 border-t border-black/8 pt-3 text-[9px] leading-4 text-black/35">
+                        {language === "tr" ? "Bir şablon seçtiğinizde önizleme anında güncellenir." : "Selecting a layout updates the preview instantly."}
+                      </p>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="mx-1 h-px bg-black/7" />
+
+                {/* Section 5: PDF Font Selector */}
                 <div className="flex flex-col gap-1.5 px-0.5 pb-0.5">
                   <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-[0.14em] text-black/35">
                     {t.fontSelectorLabel}
