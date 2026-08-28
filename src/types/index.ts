@@ -22,6 +22,16 @@ export interface LineItem {
   price: number | string;
 }
 
+export interface SavedService {
+  id: string;
+  name: string;
+  description?: string;
+  price: number | string;
+  currency?: Currency;
+  usageCount?: number;
+  lastUsedAt?: number;
+}
+
 export interface Profile {
   id: string;
   profileName: string;
