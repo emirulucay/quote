@@ -88,6 +88,11 @@ export const TRANSLATIONS = {
     pricePlaceholder: "Fiyat",
     addServiceButton: "Hizmet Ekle",
     maxLimitReached: "Maksimum Hizmet Sınırı (7)",
+    suggestedServicesTitle: "Kayıtlı & Önerilen Hizmetler",
+    suggestedServicesHint: "Tek tıkla ad, fiyat ve açıklama doldurulur",
+    removeFromSuggestions: "Önerilerden kaldır",
+    serviceAppliedToast: "Hizmet ve fiyat uygulandı",
+    savedServiceRemovedToast: "Hizmet önerilerden kaldırıldı",
 
     // Actions
     downloadPdfButton: "PDF Olarak İndir",
@@ -306,6 +311,11 @@ export const TRANSLATIONS = {
     pricePlaceholder: "Price",
     addServiceButton: "Add Service",
     maxLimitReached: "Maximum Service Limit (7)",
+    suggestedServicesTitle: "Saved & Suggested Services",
+    suggestedServicesHint: "Click to auto-fill name, price and description",
+    removeFromSuggestions: "Remove from suggestions",
+    serviceAppliedToast: "Service and price applied",
+    savedServiceRemovedToast: "Service removed from suggestions",
 
     // Actions
     downloadPdfButton: "Download PDF",

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Profile, LineItem, InvoiceData, CustomTax, ServicesLayout } from "../types";
+import { Profile, LineItem, SavedService, InvoiceData, CustomTax, ServicesLayout } from "../types";
 import { Language, Currency, TRANSLATIONS } from "../lib/i18n";
 import { toast } from "sonner";
 
@@ -81,16 +81,19 @@ export function useInvoiceState() {
   const [servicesLayout, setServicesLayoutState] = useState<ServicesLayout>("inline");
   const [hasChosenServicesLayout, setHasChosenServicesLayout] = useState<boolean>(false);
   const [customTaxes, setCustomTaxes] = useState<CustomTax[]>([]);
+  const [savedServices, setSavedServices] = useState<SavedService[]>([]);
 
   useEffect(() => {
     // Load preferences
     let layoutFromPrefs: ServicesLayout | null = null;
+    let loadedLang: Language = "tr";
     const savedPrefs = localStorage.getItem("quote-preferences");
     if (savedPrefs) {
       try {
         const parsed = JSON.parse(savedPrefs);
         if (parsed.language && (parsed.language === "tr" || parsed.language === "en")) {
           setLanguageState(parsed.language);
+          loadedLang = parsed.language;
         }
         if (parsed.currency && ["TRY", "USD", "EUR", "GBP"].includes(parsed.currency)) {
           setCurrencyState(parsed.currency);
@@ -174,15 +177,36 @@ export function useInvoiceState() {
       }
     }
 
+    // Load saved services (strictly user-saved services only)
+    const savedServicesRaw = localStorage.getItem("quote-saved-services");
+    if (savedServicesRaw) {
+      try {
+        const parsed = JSON.parse(savedServicesRaw);
+        if (Array.isArray(parsed)) {
+          const userOnly = parsed.filter((s) => s.id && !s.id.startsWith("preset-"));
+          setSavedServices(userOnly);
+        } else {
+          setSavedServices([]);
+        }
+      } catch (e) {
+        console.error("Failed to parse saved services", e);
+        setSavedServices([]);
+      }
+    } else {
+      setSavedServices([]);
+    }
+
     // Load profiles
     const savedProfiles = localStorage.getItem("invoice-profiles");
+    const savedActiveProfileId = localStorage.getItem("quote-active-profile-id");
     if (savedProfiles) {
       try {
         const parsed = JSON.parse(savedProfiles);
         const validProfiles = Array.isArray(parsed) ? parsed.filter((p) => p.id !== "default") : [];
         if (validProfiles.length > 0) {
           setProfiles(validProfiles);
-          setActiveProfileId(validProfiles[0].id);
+          const found = validProfiles.some((p) => p.id === savedActiveProfileId);
+          setActiveProfileId(found && savedActiveProfileId ? savedActiveProfileId : validProfiles[0].id);
         } else {
           setProfiles([]);
           setActiveProfileId("");
@@ -243,8 +267,11 @@ export function useInvoiceState() {
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem("invoice-profiles", JSON.stringify(profiles));
+      if (activeProfileId) {
+        localStorage.setItem("quote-active-profile-id", activeProfileId);
+      }
     }
-  }, [profiles, isLoaded]);
+  }, [profiles, activeProfileId, isLoaded]);
 
   useEffect(() => {
     if (isLoaded) {
@@ -260,6 +287,12 @@ export function useInvoiceState() {
       localStorage.setItem("quote-custom-taxes", JSON.stringify(customTaxes));
     }
   }, [customTaxes, isLoaded]);
+
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem("quote-saved-services", JSON.stringify(savedServices));
+    }
+  }, [savedServices, isLoaded]);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
@@ -291,6 +324,49 @@ export function useInvoiceState() {
     };
     setCustomTaxes((prev) => [...prev, newTax]);
     return newTax;
+  };
+
+  const saveOrUpdateServices = (itemsToSave: LineItem[], targetCurrency?: Currency) => {
+    const curr = targetCurrency || currency;
+    setSavedServices((prev) => {
+      let next = [...prev];
+      for (const item of itemsToSave) {
+        const name = item.name.trim();
+        const priceNum = Number(item.price);
+        if (!name || isNaN(priceNum) || priceNum <= 0) continue;
+
+        const existingIndex = next.findIndex(
+          (s) => s.name.trim().toLowerCase() === name.toLowerCase() && (s.currency === curr || !s.currency)
+        );
+
+        if (existingIndex >= 0) {
+          next[existingIndex] = {
+            ...next[existingIndex],
+            name,
+            price: priceNum,
+            description: item.description?.trim() || next[existingIndex].description,
+            currency: curr,
+            usageCount: (next[existingIndex].usageCount || 0) + 1,
+            lastUsedAt: Date.now(),
+          };
+        } else {
+          next.unshift({
+            id: `saved-${crypto.randomUUID()}`,
+            name,
+            description: item.description?.trim() || "",
+            price: priceNum,
+            currency: curr,
+            usageCount: 1,
+            lastUsedAt: Date.now(),
+          });
+        }
+      }
+      return next.slice(0, 35);
+    });
+  };
+
+  const deleteSavedService = (id: string) => {
+    setSavedServices((prev) => prev.filter((s) => s.id !== id));
   };
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId) || profiles[0] || null;
@@ -364,6 +440,9 @@ export function useInvoiceState() {
     customTaxes,
     allTaxes,
     addCustomTax,
+    savedServices,
+    saveOrUpdateServices,
+    deleteSavedService,
     t,
   };
 }

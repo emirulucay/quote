@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, ChangeEvent } from "react";
+import { useRef, useState, useEffect, ChangeEvent } from "react";
 import { QuoteLogo } from "@/components/quote-logo";
 import { useInvoiceState } from "@/hooks/use-invoice-state";
 import { Button } from "@/components/ui/button";
@@ -146,6 +146,23 @@ export default function AppPage() {
   const [activeTab, setActiveTab] = useState<"details" | "services">("details");
   const [expandedDescriptions, setExpandedDescriptions] = useState<string[]>([]);
   const [previewZoom, setPreviewZoom] = useState(90);
+  const [activeAutocompleteId, setActiveAutocompleteId] = useState<string | null>(null);
+
+  // Load preview zoom from localStorage
+  useEffect(() => {
+    const savedZoom = localStorage.getItem("quote-preview-zoom");
+    if (savedZoom) {
+      const parsed = Number(savedZoom);
+      if (!isNaN(parsed) && parsed >= 50 && parsed <= 120) {
+        setPreviewZoom(parsed);
+      }
+    }
+  }, []);
+
+  // Save preview zoom to localStorage
+  useEffect(() => {
+    localStorage.setItem("quote-preview-zoom", String(previewZoom));
+  }, [previewZoom]);
 
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newContactInfo, setNewContactInfo] = useState("");
@@ -181,6 +198,9 @@ export default function AppPage() {
     customTaxes,
     allTaxes,
     addCustomTax,
+    savedServices,
+    saveOrUpdateServices,
+    deleteSavedService,
     t,
   } = state;
 
@@ -198,6 +218,11 @@ export default function AppPage() {
     if (!element) return;
 
     try {
+      // Auto-remember services used in quote
+      if (lineItems.length > 0) {
+        saveOrUpdateServices(lineItems, currency);
+      }
+
       const { toJpeg } = await import("html-to-image");
       const { jsPDF } = await import("jspdf");
 
@@ -1139,26 +1164,153 @@ export default function AppPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <AnimatePresence>
-                      {lineItems.map((item, index) => (
-                        <motion.div
-                          key={item.id}
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="relative flex flex-col gap-2 rounded-xl border border-black/8 bg-white p-3 shadow-[0_3px_12px_rgba(20,21,18,0.03)]"
-                        >
-                          <div className="grid grid-cols-[minmax(0,1fr)_4.25rem_6.5rem_2rem] items-center gap-2">
-                            <Input
-                              id={`service-name-${item.id}`}
-                              aria-label={`${language === "tr" ? "Hizmet" : "Service"} ${index + 1}`}
-                              placeholder={t.serviceNamePlaceholder}
-                              value={item.name}
-                              maxLength={65}
-                              onChange={(e) => updateLineItem(item.id, { name: e.target.value })}
-                              className="h-10 rounded-lg border-black/8 bg-[#fbfaf7] px-3 text-sm font-medium shadow-none"
-                            />
+                      {lineItems.map((item, index) => {
+                        const query = (item.name || "").trim().toLowerCase();
+                        let matchingServices = savedServices.filter((s) => {
+                          const matchesCurr = !s.currency || s.currency === currency;
+                          if (!matchesCurr) return false;
+                          if (!query) return true;
+                          return (
+                            s.name.toLowerCase().includes(query) ||
+                            (s.description ? s.description.toLowerCase().includes(query) : false)
+                          );
+                        });
+
+                        if (matchingServices.length === 0 && savedServices.length > 0 && query) {
+                          matchingServices = savedServices.filter(
+                            (s) =>
+                              s.name.toLowerCase().includes(query) ||
+                              (s.description ? s.description.toLowerCase().includes(query) : false)
+                          );
+                        }
+
+                        const suggestionsToShow = matchingServices.slice(0, 6);
+
+                        return (
+                          <motion.div
+                            key={item.id}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="relative flex flex-col gap-2 rounded-xl border border-black/8 bg-white p-3 shadow-[0_3px_12px_rgba(20,21,18,0.03)]"
+                          >
+                            <div className="grid grid-cols-[minmax(0,1fr)_4.25rem_6.5rem_2rem] items-center gap-2">
+                              <div className="relative min-w-0">
+                                <Input
+                                  id={`service-name-${item.id}`}
+                                  aria-label={`${language === "tr" ? "Hizmet" : "Service"} ${index + 1}`}
+                                  placeholder={t.serviceNamePlaceholder}
+                                  value={item.name}
+                                  maxLength={65}
+                                  onFocus={() => setActiveAutocompleteId(item.id)}
+                                  onBlur={() => {
+                                    setTimeout(() => {
+                                      setActiveAutocompleteId((current) => (current === item.id ? null : current));
+                                    }, 200);
+                                    if (item.name.trim() && Number(item.price) > 0) {
+                                      saveOrUpdateServices([item], currency);
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    updateLineItem(item.id, { name: e.target.value });
+                                    if (activeAutocompleteId !== item.id) setActiveAutocompleteId(item.id);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Escape") {
+                                      setActiveAutocompleteId(null);
+                                    }
+                                  }}
+                                  className="h-10 rounded-lg border-black/8 bg-[#fbfaf7] px-3 text-sm font-medium shadow-none"
+                                />
+
+                                {/* Autocomplete Suggestions Popover */}
+                                <AnimatePresence>
+                                  {activeAutocompleteId === item.id && suggestionsToShow.length > 0 && (
+                                    <motion.div
+                                      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                                      transition={{ duration: 0.15 }}
+                                      className="absolute left-0 top-[calc(100%+6px)] z-50 w-full min-w-72 max-w-96 rounded-2xl border border-black/10 bg-[#fbfaf7] p-2 shadow-[0_16px_36px_rgba(20,21,18,0.18)] backdrop-blur-md"
+                                    >
+                                      <div className="mb-1.5 flex items-center justify-between border-b border-black/6 px-2 pb-1.5 pt-0.5">
+                                        <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-black/45">
+                                          <Sparkles className="size-3 text-[#799000]" />
+                                          {t.suggestedServicesTitle}
+                                        </span>
+                                        <span className="text-[8.5px] font-mono text-black/35">{suggestionsToShow.length}</span>
+                                      </div>
+
+                                      <div className="max-h-52 space-y-1 overflow-y-auto pr-0.5">
+                                        {suggestionsToShow.map((s) => (
+                                          <div
+                                            key={s.id}
+                                            onMouseDown={(e) => {
+                                              e.preventDefault();
+                                              updateLineItem(item.id, {
+                                                name: s.name,
+                                                price: s.price,
+                                                description: s.description || item.description || "",
+                                              });
+                                              if (s.description && !expandedDescriptions.includes(item.id)) {
+                                                setExpandedDescriptions((prev) => [...prev, item.id]);
+                                              }
+                                              setActiveAutocompleteId(null);
+                                              toast.success(t.serviceAppliedToast);
+                                            }}
+                                            className="group flex items-center justify-between gap-2.5 rounded-xl border border-transparent px-2.5 py-2 transition-all hover:border-black/6 hover:bg-white hover:shadow-2xs cursor-pointer"
+                                          >
+                                            <div className="flex min-w-0 flex-1 flex-col">
+                                              <span className="truncate text-[11.5px] font-semibold leading-tight text-black/85">
+                                                {s.name}
+                                              </span>
+                                              {s.description && (
+                                                <span className="mt-0.5 truncate text-[9px] leading-tight text-black/45">
+                                                  {s.description}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className="flex shrink-0 items-center gap-1.5">
+                                              <span className="rounded-lg border border-[#b8ca62]/40 bg-[#eef7bd]/80 px-2 py-0.5 font-mono text-[10px] font-bold text-[#4d5d00]">
+                                                {formatCurrency(Number(s.price), currency)}
+                                              </span>
+                                              <button
+                                                type="button"
+                                                title={t.removeFromSuggestions}
+                                                onMouseDown={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  deleteSavedService(s.id);
+                                                  toast.success(t.savedServiceRemovedToast);
+                                                }}
+                                                className="flex size-5 items-center justify-center rounded-full text-black/25 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 cursor-pointer"
+                                              >
+                                                <X className="size-3" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
                             <Input type="number" min="1" aria-label={t.thQuantity} placeholder={t.quantityPlaceholder} value={item.quantity} onChange={(e) => updateLineItem(item.id, { quantity: e.target.value === "" ? "" : Number(e.target.value) })} className="h-10 rounded-lg border-black/8 bg-[#fbfaf7] px-2 text-center shadow-none" />
-                            <Input type="number" min="0" step="0.01" aria-label={`${t.thPrice} · ${currency}`} placeholder={`${CURRENCIES[currency].symbol} ${t.pricePlaceholder}`} value={item.price} onChange={(e) => updateLineItem(item.id, { price: e.target.value === "" ? "" : Number(e.target.value) })} className="h-10 rounded-lg border-black/8 bg-[#fbfaf7] px-2 shadow-none" />
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              aria-label={`${t.thPrice} · ${currency}`}
+                              placeholder={`${CURRENCIES[currency].symbol} ${t.pricePlaceholder}`}
+                              value={item.price}
+                              onChange={(e) => updateLineItem(item.id, { price: e.target.value === "" ? "" : Number(e.target.value) })}
+                              onBlur={() => {
+                                if (item.name.trim() && Number(item.price) > 0) {
+                                  saveOrUpdateServices([item], currency);
+                                }
+                              }}
+                              className="h-10 rounded-lg border-black/8 bg-[#fbfaf7] px-2 shadow-none"
+                            />
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1189,7 +1341,8 @@ export default function AppPage() {
                             </button>
                           )}
                         </motion.div>
-                      ))}
+                      );
+                    })}
                     </AnimatePresence>
                     <Button
                       variant="dashed"
