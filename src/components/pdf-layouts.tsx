@@ -2,7 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
-import { Building2, CalendarClock } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { InvoiceData, Profile, LineItem, Currency, Language } from "@/types";
 
 export interface PdfLayoutProps {
@@ -65,15 +65,6 @@ export function ModernPdfLayout(props: PdfLayoutProps) {
             </>
           )}
         </div>
-        {/* Due Date or Validity badge */}
-        {invoiceData.showDueDate && invoiceData.dueDate && (
-          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#e3e2dc] bg-[#f5f3ee] px-3 py-1 text-[11px] font-medium text-[#4c4c4c]">
-            <CalendarClock className="size-3 text-[#7f7f7f]" />
-            <span>
-              {t.dueDatePrefix}: {invoiceData.dueDate}
-            </span>
-          </div>
-        )}
         {invoiceData.billingType === "subscription" &&
           (invoiceData.periodStart || invoiceData.periodEnd) && (
             <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-[#e3e2dc] bg-[#f5f3ee] px-4 py-1.5 text-xs font-medium text-[#171815]">
@@ -244,18 +235,6 @@ export function ModernPdfLayout(props: PdfLayoutProps) {
             <p className="whitespace-pre-wrap leading-relaxed text-[#4c4c4c]">{invoiceData.notes}</p>
           </div>
         )}
-
-        {/* Signature & Stamp Area on PDF */}
-        {invoiceData.showSignature && (
-          <div className="mt-8 flex justify-end">
-            <div className="w-56 border-t border-[#999999] pt-2 text-center">
-              <p className="text-xs font-semibold text-[#171815]">
-                {invoiceData.signatureTitle || t.signatureLineText}
-              </p>
-              <p className="mt-0.5 text-[9px] text-[#737373]">{invoiceData.date}</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Footer (Logo & Freelancer Info) */}
@@ -337,12 +316,6 @@ export function CorporatePdfLayout(props: PdfLayoutProps) {
               <span className="font-semibold text-[#666666]">{t.dateLabel}:</span>
               <span className="font-mono font-medium text-[#171815]">{invoiceData.date}</span>
             </div>
-            {invoiceData.showDueDate && invoiceData.dueDate && (
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-[#666666]">{t.dueDatePrefix}:</span>
-                <span className="font-mono font-medium text-[#171815]">{invoiceData.dueDate}</span>
-              </div>
-            )}
             {invoiceData.billingType === "subscription" && (
               <div className="mt-1 flex items-center gap-1.5 rounded-full bg-[#171815] px-2 py-0.5 text-[10px] font-semibold text-white">
                 <span>
@@ -524,15 +497,6 @@ export function CorporatePdfLayout(props: PdfLayoutProps) {
                 </div>
               </div>
             </div>
-
-            {invoiceData.showSignature && (
-              <div className="mt-8 w-52 border-t-2 border-[#171815] pt-2 text-center">
-                <p className="text-xs font-bold text-[#171815]">
-                  {invoiceData.signatureTitle || t.signatureLineText}
-                </p>
-                <p className="mt-0.5 text-[9px] text-[#777777]">{invoiceData.date}</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -582,11 +546,6 @@ export function CreativePdfLayout(props: PdfLayoutProps) {
             <span className="rounded-full border border-black/10 bg-[#f5f3ee] px-3 py-1 font-mono text-xs font-semibold text-[#171815]">
               {invoiceData.date}
             </span>
-            {invoiceData.showDueDate && invoiceData.dueDate && (
-              <span className="rounded-full border border-black/10 bg-[#f5f3ee] px-3 py-1 text-xs font-semibold text-[#4c4c4c]">
-                {t.dueDatePrefix}: {invoiceData.dueDate}
-              </span>
-            )}
             {invoiceData.billingType === "subscription" && (
               <span className="rounded-full bg-[#171815] px-3 py-1 text-xs font-bold text-[#dff568]">
                 {invoiceData.billingCycle === "monthly"
@@ -760,17 +719,6 @@ export function CreativePdfLayout(props: PdfLayoutProps) {
               <p className="whitespace-pre-wrap text-xs text-[#737373] mt-0.5">{activeProfile.contactInfo}</p>
             </div>
           </div>
-
-          {invoiceData.showSignature && (
-            <div className="flex justify-end">
-              <div className="w-48 border-t-2 border-[#171815] pt-2 text-center">
-                <p className="text-xs font-bold text-[#171815]">
-                  {invoiceData.signatureTitle || t.signatureLineText}
-                </p>
-                <p className="mt-0.5 text-[9px] text-[#737373]">{invoiceData.date}</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -823,16 +771,6 @@ export function DarkPdfLayout(props: PdfLayoutProps) {
             </>
           )}
         </div>
-
-        {/* Due Date & Subscription Badges */}
-        {invoiceData.showDueDate && invoiceData.dueDate && (
-          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1f211c] px-3 py-1 text-[11px] font-medium text-[#d5d4ce]">
-            <CalendarClock className="size-3 text-[#dff568]" />
-            <span>
-              {t.dueDatePrefix}: {invoiceData.dueDate}
-            </span>
-          </div>
-        )}
 
         {invoiceData.billingType === "subscription" &&
           (invoiceData.periodStart || invoiceData.periodEnd) && (
@@ -1002,18 +940,6 @@ export function DarkPdfLayout(props: PdfLayoutProps) {
               {language === "tr" ? "Notlar ve Şartlar" : "Notes & Terms"}
             </p>
             <p className="whitespace-pre-wrap leading-relaxed text-[#d5d4ce]">{invoiceData.notes}</p>
-          </div>
-        )}
-
-        {/* Signature & Stamp Area on PDF */}
-        {invoiceData.showSignature && (
-          <div className="mt-8 flex justify-end">
-            <div className="w-56 border-t border-white/20 pt-2 text-center">
-              <p className="text-xs font-semibold text-white">
-                {invoiceData.signatureTitle || t.signatureLineText}
-              </p>
-              <p className="mt-0.5 text-[9px] text-[#85847e]">{invoiceData.date}</p>
-            </div>
           </div>
         )}
       </div>

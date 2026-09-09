@@ -32,6 +32,13 @@ export interface SavedService {
   lastUsedAt?: number;
 }
 
+export interface SavedClient {
+  id: string;
+  name: string;
+  usageCount?: number;
+  lastUsedAt?: number;
+}
+
 export interface Profile {
   id: string;
   profileName: string;
@@ -60,10 +67,23 @@ export interface InvoiceData {
   accountHolder?: string;
   showDiscount?: boolean;
   discountRate?: number;
-  showSignature?: boolean;
-  signatureTitle?: string;
-  showDueDate?: boolean;
-  dueDate?: string;
   pdfFont?: PdfFont;
   pdfLayout?: PdfLayout;
+}
+
+/** A finished quote kept in localStorage so it can be reopened later. */
+export interface SavedQuote {
+  id: string;
+  quoteNumber: string;
+  clientName: string;
+  title?: string;
+  date: string;
+  total: number;
+  currency: Currency;
+  language: Language;
+  profileId: string;
+  itemCount: number;
+  savedAt: number;
+  invoiceData: InvoiceData;
+  lineItems: LineItem[];
 }
