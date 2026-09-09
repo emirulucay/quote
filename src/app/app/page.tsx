@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Trash2, Plus, Minus, Download, Upload, X, Coffee, Heart, Globe, Coins, ArrowLeft, ArrowRight, Check, ShieldCheck, Pencil, LayoutList, Columns2, Sparkles, RefreshCw, Building2, Percent, PenTool, CalendarClock, FileText, Type, ChevronLeft, ChevronDown, LayoutTemplate } from "lucide-react";
+import { Trash2, Plus, Minus, Download, Upload, X, Coffee, Heart, Globe, Coins, ArrowLeft, ArrowRight, Check, ShieldCheck, Pencil, LayoutList, Columns2, Sparkles, RefreshCw, Building2, Percent, FileText, Type, ChevronLeft, ChevronDown, LayoutTemplate, History, FilePlus2, Database, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { DEFAULT_COMPANY_LOGO } from "@/hooks/use-invoice-state";
@@ -27,6 +27,8 @@ import { cn } from "@/lib/utils";
 import { CURRENCIES, Language, Currency } from "@/lib/i18n";
 import { ServicesLayout, PdfFont, PdfLayout } from "@/types";
 import { PdfDocumentRenderer } from "@/components/pdf-layouts";
+import { compressLogo } from "@/lib/image";
+import { getStorageUsage, safeSetItem, safeGetItem, STORAGE_KEYS } from "@/lib/storage";
 
 const getPdfFontClass = (font?: PdfFont) => {
   switch (font) {
@@ -147,10 +149,13 @@ export default function AppPage() {
   const [expandedDescriptions, setExpandedDescriptions] = useState<string[]>([]);
   const [previewZoom, setPreviewZoom] = useState(90);
   const [activeAutocompleteId, setActiveAutocompleteId] = useState<string | null>(null);
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [confirmingHistoryClear, setConfirmingHistoryClear] = useState(false);
 
   // Load preview zoom from localStorage
   useEffect(() => {
-    const savedZoom = localStorage.getItem("quote-preview-zoom");
+    const savedZoom = safeGetItem(STORAGE_KEYS.previewZoom);
     if (savedZoom) {
       const parsed = Number(savedZoom);
       if (!isNaN(parsed) && parsed >= 50 && parsed <= 120) {
@@ -161,7 +166,7 @@ export default function AppPage() {
 
   // Save preview zoom to localStorage
   useEffect(() => {
-    localStorage.setItem("quote-preview-zoom", String(previewZoom));
+    safeSetItem(STORAGE_KEYS.previewZoom, String(previewZoom));
   }, [previewZoom]);
 
   const [newCompanyName, setNewCompanyName] = useState("");
@@ -201,6 +206,15 @@ export default function AppPage() {
     savedServices,
     saveOrUpdateServices,
     deleteSavedService,
+    savedClients,
+    saveClient,
+    deleteSavedClient,
+    quoteHistory,
+    saveQuoteToHistory,
+    deleteQuoteFromHistory,
+    clearQuoteHistory,
+    loadQuoteFromHistory,
+    startNewQuote,
     t,
   } = state;
 
@@ -213,6 +227,15 @@ export default function AppPage() {
   const kdvAmount = taxableBase * ((invoiceData.kdvRate || 0) / 100);
   const total = taxableBase + kdvAmount;
 
+  const clientQuery = invoiceData.clientName.trim().toLowerCase();
+  const clientSuggestions = savedClients
+    .filter((client) => {
+      const name = client.name.trim().toLowerCase();
+      // An exact match means the field is already filled in; nothing left to offer.
+      return name !== clientQuery && (!clientQuery || name.includes(clientQuery));
+    })
+    .slice(0, 6);
+
   const handleDownloadPDF = async () => {
     const element = printRef.current;
     if (!element) return;
@@ -222,6 +245,8 @@ export default function AppPage() {
       if (lineItems.length > 0) {
         saveOrUpdateServices(lineItems, currency);
       }
+      // Auto-remember the client so it can be suggested next time
+      saveClient(invoiceData.clientName);
 
       const { toJpeg } = await import("html-to-image");
       const { jsPDF } = await import("jspdf");
@@ -251,7 +276,10 @@ export default function AppPage() {
       const fileName = clientSlug ? `teklif-${clientSlug}.pdf` : `teklif.pdf`;
 
       pdf.save(fileName);
-      toast.success(language === "tr" ? "PDF başarıyla indirildi" : "PDF downloaded successfully");
+
+      // Archive the quote so it can be reopened after the tab is closed.
+      saveQuoteToHistory(total);
+      toast.success(language === "tr" ? "PDF indirildi ve geçmişe kaydedildi" : "PDF downloaded and saved to history");
 
       setTimeout(() => {
         const hasSeen = sessionStorage.getItem("hasSeenSupportModal");
@@ -308,31 +336,38 @@ export default function AppPage() {
     }
   };
 
-  const handleProfileLogoUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleProfileLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
       toast.error(language === "tr" ? "Lütfen bir görsel dosyası seçin" : "Please choose an image file");
-      e.target.value = "";
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       toast.error(language === "tr" ? "Logo dosyası 5 MB'dan küçük olmalı" : "Logo must be smaller than 5 MB");
-      e.target.value = "";
       return;
     }
 
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewLogoBase64(reader.result as string);
-        toast.success(language === "tr" ? "Logo hazır" : "Logo ready");
-      };
-      reader.readAsDataURL(file);
+    // Logos live in localStorage as base64, so they are downscaled before
+    // storing — an untouched upload alone can exhaust the origin quota.
+    try {
+      setNewLogoBase64(await compressLogo(file));
+      toast.success(language === "tr" ? "Logo hazır" : "Logo ready");
+    } catch (error) {
+      console.error("Logo processing failed:", error);
+      toast.error(language === "tr" ? "Logo işlenemedi" : "Logo could not be processed");
     }
-    e.target.value = "";
+  };
+
+  const handleStartNewQuote = () => {
+    if (lineItems.length > 0 && !window.confirm(t.newQuoteConfirm)) return;
+    startNewQuote();
+    setShowHistoryModal(false);
+    setActiveTab("details");
+    toast.success(t.newQuoteToast);
   };
 
   const renderProfileLogoUploader = (inputId: string) => (
@@ -630,6 +665,146 @@ export default function AppPage() {
 
   return (
     <div className="h-screen w-full flex flex-col lg:flex-row overflow-hidden bg-[#ebe9e3] relative font-plex">
+
+      {/* Quote History & Data Modal */}
+      {showHistoryModal && (
+        <div
+          className="fixed inset-0 z-100 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+          onClick={() => setShowHistoryModal(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-140 flex-col gap-5 rounded-3xl border border-white/60 bg-[#fbfaf7] p-6 font-plex shadow-[0_28px_80px_rgba(20,21,18,0.25)] sm:p-7"
+          >
+            <button
+              onClick={() => setShowHistoryModal(false)}
+              aria-label={language === "tr" ? "Kapat" : "Close"}
+              className="absolute right-5 top-5 flex size-9 cursor-pointer items-center justify-center rounded-full border border-black/8 bg-white text-black/40 transition-colors hover:border-black/20 hover:text-black"
+            >
+              <X className="size-4" />
+            </button>
+
+            <div className="flex items-start justify-between gap-4 pr-14">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#dff568]">
+                    <History className="size-4 text-black" />
+                  </span>
+                  <h2 className="text-xl font-semibold tracking-[-0.025em]">{t.historyTitle}</h2>
+                </div>
+                <p className="mt-2 text-[11.5px] leading-5 text-black/45">{t.historyDesc}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleStartNewQuote}
+                className="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-[#171815] px-4 text-[10.5px] font-semibold text-white transition-colors hover:bg-black"
+              >
+                <FilePlus2 className="size-3.5" />
+                {t.newQuoteButton}
+              </button>
+            </div>
+
+
+            {/* Saved quotes */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {quoteHistory.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-black/12 bg-black/[0.018] px-5 py-10 text-center">
+                  <p className="text-[13px] font-semibold text-black/60">{t.historyEmptyTitle}</p>
+                  <p className="mx-auto mt-1.5 max-w-72 text-[11px] leading-5 text-black/40">{t.historyEmptyDesc}</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {quoteHistory.map((quote) => (
+                    <div
+                      key={quote.id}
+                      className="group flex items-center gap-3 rounded-2xl border border-black/8 bg-white p-3 transition-all hover:border-black/18 hover:shadow-[0_6px_18px_rgba(20,21,18,0.06)]"
+                    >
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 rounded-md bg-black/6 px-1.5 py-0.5 font-mono text-[9.5px] font-bold text-black/55">
+                            {quote.quoteNumber}
+                          </span>
+                          <span className="truncate text-[12.5px] font-semibold text-black/85">
+                            {quote.clientName || t.clientNamePlaceholder}
+                          </span>
+                        </div>
+                        <span className="mt-1 truncate font-mono text-[10px] text-black/40">
+                          {quote.date} · {quote.itemCount} {t.historyItemsLabel}
+                        </span>
+                      </div>
+
+                      <span className="shrink-0 rounded-lg border border-[#b8ca62]/40 bg-[#eef7bd]/80 px-2 py-1 font-mono text-[10.5px] font-bold text-[#4d5d00]">
+                        {formatCurrency(quote.total, quote.currency)}
+                      </span>
+
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            loadQuoteFromHistory(quote);
+                            setShowHistoryModal(false);
+                            setActiveTab("details");
+                            toast.success(t.historyLoadedToast);
+                          }}
+                          className="h-8 cursor-pointer rounded-full bg-[#171815] px-3.5 text-[10.5px] font-semibold text-white transition-colors hover:bg-black"
+                        >
+                          {t.historyOpenAction}
+                        </button>
+                        <button
+                          type="button"
+                          title={t.historyDeleteAction}
+                          aria-label={`${t.historyDeleteAction} ${quote.quoteNumber}`}
+                          onClick={() => {
+                            deleteQuoteFromHistory(quote.id);
+                            toast.success(t.historyDeletedToast);
+                          }}
+                          className="flex size-8 cursor-pointer items-center justify-center rounded-full text-black/25 transition-all hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Storage footer */}
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-black/8 pt-4">
+              <span className="flex items-center gap-1.5 font-mono text-[9.5px] font-semibold text-black/40">
+                <Database className="size-3 text-black/30" />
+                {t.storageUsageLabel}: {Math.max(1, Math.round(getStorageUsage() / 1024))} KB
+              </span>
+              {quoteHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmingHistoryClear) {
+                      clearQuoteHistory();
+                      setConfirmingHistoryClear(false);
+                      toast.success(t.historyClearedToast);
+                    } else {
+                      setConfirmingHistoryClear(true);
+                    }
+                  }}
+                  onBlur={() => setConfirmingHistoryClear(false)}
+                  className={cn(
+                    "flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border px-3.5 text-[10.5px] font-semibold transition-colors",
+                    confirmingHistoryClear
+                      ? "border-red-300 bg-red-600 text-white hover:bg-red-700"
+                      : "border-black/10 bg-white text-black/50 hover:border-red-200 hover:text-red-600"
+                  )}
+                >
+                  <Trash2 className="size-3.5" />
+                  {confirmingHistoryClear ? (language === "tr" ? "Emin misiniz?" : "Are you sure?") : t.historyClearAction}
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Custom Tax Modal */}
       {showTaxModal && (
@@ -1030,15 +1205,23 @@ export default function AppPage() {
                       </div>
                     </div>
 
-                    <div className="grid gap-2">
+                    <div className="relative grid gap-2">
                       <Label htmlFor="clientName">{t.clientNameLabel}</Label>
                       <Input
                         id="clientName"
+                        autoComplete="off"
+                        data-1p-ignore
+                        data-lpignore="true"
+                        data-form-type="other"
                         value={invoiceData.clientName}
-                        onChange={(e) => setInvoiceData({ ...invoiceData, clientName: e.target.value })}
+                        onChange={(e) => {
+                          setInvoiceData({ ...invoiceData, clientName: e.target.value });
+                          setShowClientSuggestions(true);
+                        }}
                         placeholder={t.clientNamePlaceholder}
                         className="h-12 rounded-xl border-black/10 bg-white px-4 shadow-none"
                         onFocus={() => {
+                          setShowClientSuggestions(true);
                           if (
                             invoiceData.clientName === "Ahmet Yılmaz" ||
                             invoiceData.clientName === "John Doe" ||
@@ -1048,7 +1231,65 @@ export default function AppPage() {
                             setInvoiceData({ ...invoiceData, clientName: "" });
                           }
                         }}
+                        onBlur={() => {
+                          setTimeout(() => setShowClientSuggestions(false), 200);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") setShowClientSuggestions(false);
+                        }}
                       />
+
+                      {/* Saved client suggestions */}
+                      <AnimatePresence>
+                        {showClientSuggestions && clientSuggestions.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute left-0 top-[calc(100%+6px)] z-50 w-full rounded-2xl border border-black/10 bg-[#fbfaf7] p-2 shadow-[0_16px_36px_rgba(20,21,18,0.18)]"
+                          >
+                            <div className="mb-1.5 flex items-center justify-between border-b border-black/6 px-2 pb-1.5 pt-0.5">
+                              <span className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-black/45">
+                                <Users className="size-3 text-[#799000]" />
+                                {t.savedClientsTitle}
+                              </span>
+                              <span className="font-mono text-[8.5px] text-black/35">{clientSuggestions.length}</span>
+                            </div>
+                            <div className="max-h-52 space-y-1 overflow-y-auto pr-0.5">
+                              {clientSuggestions.map((client) => (
+                                <div
+                                  key={client.id}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setInvoiceData({ ...invoiceData, clientName: client.name });
+                                    setShowClientSuggestions(false);
+                                    toast.success(t.clientAppliedToast);
+                                  }}
+                                  className="group flex cursor-pointer items-center justify-between gap-2.5 rounded-lg border border-transparent px-2.5 py-1.5 transition-all hover:border-black/6 hover:bg-white hover:shadow-2xs"
+                                >
+                                  <span className="truncate text-[11.5px] font-semibold leading-tight text-black/85">
+                                    {client.name}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    title={t.removeFromClients}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      deleteSavedClient(client.id);
+                                      toast.success(t.savedClientRemovedToast);
+                                    }}
+                                    className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-black/25 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                                  >
+                                    <X className="size-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="grid gap-2">
@@ -1194,10 +1435,14 @@ export default function AppPage() {
                             exit={{ opacity: 0, height: 0 }}
                             className="relative flex flex-col gap-2 rounded-xl border border-black/8 bg-white p-3 shadow-[0_3px_12px_rgba(20,21,18,0.03)]"
                           >
-                            <div className="grid grid-cols-[minmax(0,1fr)_4.25rem_6.5rem_2rem] items-center gap-2">
+                            <div className="grid grid-cols-[minmax(0,1fr)_3.25rem_6.25rem_2rem] items-center gap-2">
                               <div className="relative min-w-0">
                                 <Input
                                   id={`service-name-${item.id}`}
+                                  autoComplete="off"
+                                  data-1p-ignore
+                                  data-lpignore="true"
+                                  data-form-type="other"
                                   aria-label={`${language === "tr" ? "Hizmet" : "Service"} ${index + 1}`}
                                   placeholder={t.serviceNamePlaceholder}
                                   value={item.name}
@@ -1296,21 +1541,26 @@ export default function AppPage() {
                                 </AnimatePresence>
                               </div>
                             <Input type="number" min="1" aria-label={t.thQuantity} placeholder={t.quantityPlaceholder} value={item.quantity} onChange={(e) => updateLineItem(item.id, { quantity: e.target.value === "" ? "" : Number(e.target.value) })} className="h-10 rounded-lg border-black/8 bg-[#fbfaf7] px-2 text-center shadow-none" />
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              aria-label={`${t.thPrice} · ${currency}`}
-                              placeholder={`${CURRENCIES[currency].symbol} ${t.pricePlaceholder}`}
-                              value={item.price}
-                              onChange={(e) => updateLineItem(item.id, { price: e.target.value === "" ? "" : Number(e.target.value) })}
-                              onBlur={() => {
-                                if (item.name.trim() && Number(item.price) > 0) {
-                                  saveOrUpdateServices([item], currency);
-                                }
-                              }}
-                              className="h-10 rounded-lg border-black/8 bg-[#fbfaf7] px-2 shadow-none"
-                            />
+                            <div className="relative">
+                              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-geist text-[11px] font-semibold text-black/32">
+                                {CURRENCIES[currency].symbol}
+                              </span>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                aria-label={`${t.thPrice} · ${currency}`}
+                                placeholder={t.pricePlaceholder}
+                                value={item.price}
+                                onChange={(e) => updateLineItem(item.id, { price: e.target.value === "" ? "" : Number(e.target.value) })}
+                                onBlur={() => {
+                                  if (item.name.trim() && Number(item.price) > 0) {
+                                    saveOrUpdateServices([item], currency);
+                                  }
+                                }}
+                                className="h-10 rounded-lg border-black/8 bg-[#fbfaf7] pl-6 pr-2 shadow-none"
+                              />
+                            </div>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1367,11 +1617,29 @@ export default function AppPage() {
 
             </div>
             {/* Action Buttons */}
-            <div className="shrink-0 p-5 md:px-8 md:py-5 border-t border-black/8 bg-[#fbfaf7]/95 backdrop-blur">
-              <Button onClick={handleDownloadPDF} className="w-full h-14 rounded-full bg-[#171815] text-sm font-semibold shadow-[0_10px_24px_rgba(20,21,18,0.16)] cursor-pointer hover:bg-black">
+            <div className="flex shrink-0 items-center gap-2.5 border-t border-black/8 bg-[#fbfaf7]/95 p-5 backdrop-blur md:px-8 md:py-5">
+              <Button onClick={handleDownloadPDF} className="h-14 flex-1 rounded-full bg-[#171815] text-sm font-semibold shadow-[0_10px_24px_rgba(20,21,18,0.16)] cursor-pointer hover:bg-black">
                 <Download className="w-5 h-5 mr-2" />
                 {t.downloadPdfButton}<span className="ml-1 text-[10px] font-normal text-white/45">· A4</span>
               </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmingHistoryClear(false);
+                  setShowHistoryModal(true);
+                }}
+                title={t.historyTitle}
+                aria-label={t.historyTitle}
+                className="relative flex h-14 shrink-0 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-white px-4 text-[11px] font-semibold text-black/60 transition-all hover:border-black/25 hover:text-black"
+              >
+                <History className="size-4" />
+                <span className="hidden sm:inline">{t.historyButton}</span>
+                {quoteHistory.length > 0 && (
+                  <span className="flex min-w-5 items-center justify-center rounded-full bg-[#dff568] px-1.5 py-0.5 font-mono text-[9px] font-bold text-black">
+                    {quoteHistory.length}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
 
@@ -1432,7 +1700,7 @@ export default function AppPage() {
                   <PopoverTrigger asChild>
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1.5 rounded-full border border-black/8 bg-white/75 px-3 py-1.5 text-[9px] font-semibold text-black/70 shadow-[0_4px_14px_rgba(20,21,18,0.04)] hover:bg-white hover:border-black/15 transition-all cursor-pointer"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full border border-black/8 bg-white/75 px-3.5 text-[9px] font-semibold text-black/70 shadow-[0_4px_14px_rgba(20,21,18,0.04)] hover:bg-white hover:border-black/15 transition-all cursor-pointer"
                       title={language === "tr" ? "PDF Şablonu" : "PDF Layout"}
                     >
                       <LayoutTemplate className="size-3 text-black/55" />
@@ -1477,10 +1745,10 @@ export default function AppPage() {
                     </div>
                   </PopoverContent>
                 </Popover>
-                <span className="hidden rounded-full border border-black/8 bg-white/55 px-3 py-1.5 font-mono text-[9px] font-semibold tracking-wide text-black/45 sm:inline-flex">
+                <span className="hidden h-9 items-center rounded-full border border-black/8 bg-white/55 px-3.5 font-mono text-[9px] font-semibold tracking-wide text-black/45 sm:inline-flex">
                   A4 · PDF
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-black/8 bg-white/75 px-3 py-1.5 text-[9px] font-semibold text-black/52 shadow-[0_4px_14px_rgba(20,21,18,0.04)]">
+                <span className="inline-flex h-9 items-center gap-1.5 rounded-full border border-black/8 bg-white/75 px-3.5 text-[9px] font-semibold text-black/52 shadow-[0_4px_14px_rgba(20,21,18,0.04)]">
                   <Check className="size-3 text-[#718400]" />
                   {language === "tr" ? "Kaydedildi" : "Saved"}
                 </span>
@@ -1490,9 +1758,6 @@ export default function AppPage() {
             {/* Container for A4 Paper + Right Vertical Dock */}
             <div className="relative z-10 mx-auto grid w-full max-w-288 items-start gap-5 px-3 pb-14 pt-5 sm:px-6 sm:pt-7 2xl:grid-cols-[minmax(0,1fr)_15rem] 2xl:px-7">
               <div className="relative w-full overflow-auto rounded-[1.75rem] border border-white/65 bg-white/22 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] sm:p-4">
-                <span className="pointer-events-none absolute left-5 top-5 z-10 hidden rounded-full border border-black/7 bg-[#171815]/88 px-2.5 py-1 font-mono text-[8px] font-semibold tracking-[0.12em] text-white/70 shadow-lg sm:inline-flex">
-                  01 / 01
-                </span>
                 <div
                   className="relative mx-auto shrink-0 transition-[width,max-width] duration-200 ease-out"
                   style={{
@@ -1757,17 +2022,17 @@ export default function AppPage() {
                     {language === "tr" ? "Modüller" : "Modules"}
                   </span>
 
-                  <div className="flex flex-wrap gap-1 2xl:flex-col">
+                  <div className="flex flex-wrap gap-2 2xl:flex-col">
                     {/* Notes Popover */}
                     <Popover>
                       <PopoverTrigger asChild>
                         <button
                           type="button"
                           className={cn(
-                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
+                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] font-semibold transition-all cursor-pointer 2xl:w-full",
                             invoiceData.showNotes !== false
-                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
-                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
+                              ? "border-[#b8ca62]/50 bg-[#eef7bd]/70 text-black shadow-xs"
+                              : "border-black/10 bg-white font-semibold text-black/62 shadow-xs hover:border-black/22 hover:text-black"
                           )}
                         >
                           <span className="flex items-center gap-1.5">
@@ -1836,10 +2101,10 @@ export default function AppPage() {
                         <button
                           type="button"
                           className={cn(
-                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
+                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] font-semibold transition-all cursor-pointer 2xl:w-full",
                             invoiceData.showPaymentInfo
-                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
-                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
+                              ? "border-[#b8ca62]/50 bg-[#eef7bd]/70 text-black shadow-xs"
+                              : "border-black/10 bg-white font-semibold text-black/62 shadow-xs hover:border-black/22 hover:text-black"
                           )}
                         >
                           <span className="flex items-center gap-1.5">
@@ -1919,10 +2184,10 @@ export default function AppPage() {
                         <button
                           type="button"
                           className={cn(
-                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
+                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] font-semibold transition-all cursor-pointer 2xl:w-full",
                             invoiceData.showDiscount
-                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
-                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
+                              ? "border-[#b8ca62]/50 bg-[#eef7bd]/70 text-black shadow-xs"
+                              : "border-black/10 bg-white font-semibold text-black/62 shadow-xs hover:border-black/22 hover:text-black"
                           )}
                         >
                           <span className="flex items-center gap-1.5">
@@ -1997,136 +2262,6 @@ export default function AppPage() {
                         <DockPopoverFooter language={language} />
                       </PopoverContent>
                     </Popover>
-
-                    {/* Signature Popover */}
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          className={cn(
-                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
-                            invoiceData.showSignature
-                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
-                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
-                          )}
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <PenTool className="size-3 text-black/60" />
-                            {t.moduleSignature}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showSignature ? "bg-[#8ba000]" : "bg-black/20")} />
-                            <ChevronLeft className="size-3 text-black/28" />
-                          </span>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent side="left" align="center" collisionPadding={16} className="w-78 p-4 text-xs" sideOffset={12}>
-                        <div className="flex items-start justify-between gap-3 border-b border-black/8 pb-3">
-                          <div className="flex min-w-0 items-start gap-3">
-                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#eef7bd] text-[#637500]">
-                              <PenTool className="size-4" />
-                            </span>
-                            <div>
-                              <p className="text-[12px] font-bold text-black/85">{t.signatureBoxTitle}</p>
-                              <p className="mt-1 text-[10px] leading-4 text-black/42">{language === "tr" ? "Belgenin sonuna imza ve kaşe alanı ekleyin." : "Add a signature and stamp area to the document."}</p>
-                            </div>
-                          </div>
-                          <DockPopoverCloseButton language={language} />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = !invoiceData.showSignature;
-                            setInvoiceData({ ...invoiceData, showSignature: next });
-                            toast.success(next ? (language === "tr" ? "İmza alanı aktif" : "Signature enabled") : (language === "tr" ? "İmza alanı kapalı" : "Signature disabled"));
-                          }}
-                          className={cn(
-                            "mt-3 flex h-9 w-full items-center justify-between rounded-xl px-3 text-[10px] font-semibold transition-colors",
-                            invoiceData.showSignature ? "bg-[#eef7bd] text-[#4d5d00]" : "bg-black/5 text-black/50"
-                          )}
-                        >
-                          <span>{language === "tr" ? "İmza alanını göster" : "Show signature area"}</span>
-                          <span className={cn("rounded-full px-2 py-1", invoiceData.showSignature ? "bg-white/70" : "bg-white")}>{invoiceData.showSignature ? (language === "tr" ? "Açık" : "On") : (language === "tr" ? "Kapalı" : "Off")}</span>
-                        </button>
-                        <div className="mt-4 space-y-1.5">
-                          <Label className="text-[10px] font-semibold text-black/52">{t.signatureTitleLabel}</Label>
-                          <Input
-                            value={invoiceData.signatureTitle ?? (language === "tr" ? "Yetkili İmza / Kaşe" : "Authorized Signature")}
-                            onChange={(e) => setInvoiceData({ ...invoiceData, showSignature: true, signatureTitle: e.target.value })}
-                            placeholder={t.signatureTitlePlaceholder}
-                            className="h-10 rounded-xl border-black/10 bg-white px-3 text-[11px]"
-                          />
-                        </div>
-                        <DockPopoverFooter language={language} />
-                      </PopoverContent>
-                    </Popover>
-
-                    {/* Due Date Popover */}
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          className={cn(
-                            "flex flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-[11px] transition-all cursor-pointer 2xl:w-full",
-                            invoiceData.showDueDate
-                              ? "border-[#b8ca62]/45 bg-[#eef7bd]/55 font-semibold text-black shadow-xs"
-                              : "border-transparent bg-transparent text-black/45 hover:border-black/8 hover:bg-white hover:text-black"
-                          )}
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <CalendarClock className="size-3 text-black/60" />
-                            {t.moduleDueDate}
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <span className={cn("size-1.5 rounded-full shrink-0", invoiceData.showDueDate ? "bg-[#8ba000]" : "bg-black/20")} />
-                            <ChevronLeft className="size-3 text-black/28" />
-                          </span>
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent side="left" align="center" collisionPadding={16} className="w-auto p-4 text-xs" sideOffset={12}>
-                        <div className="flex items-start justify-between gap-3 border-b border-black/8 pb-3">
-                          <div className="flex min-w-0 items-start gap-3">
-                            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#eef7bd] text-[#637500]">
-                              <CalendarClock className="size-4" />
-                            </span>
-                            <div>
-                              <p className="text-[12px] font-bold text-black/85">{t.dueDateBadgeLabel}</p>
-                              <p className="mt-1 max-w-52 text-[10px] leading-4 text-black/42">{language === "tr" ? "Ödeme veya teklif geçerlilik tarihini seçin." : "Choose the payment or quote validity date."}</p>
-                            </div>
-                          </div>
-                          <DockPopoverCloseButton language={language} />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const next = !invoiceData.showDueDate;
-                            setInvoiceData({ ...invoiceData, showDueDate: next });
-                            toast.success(next ? (language === "tr" ? "Vade tarihi aktif" : "Due date enabled") : (language === "tr" ? "Vade tarihi kapalı" : "Due date disabled"));
-                          }}
-                          className={cn(
-                            "mt-3 flex h-9 w-full items-center justify-between rounded-xl px-3 text-[10px] font-semibold transition-colors",
-                            invoiceData.showDueDate ? "bg-[#eef7bd] text-[#4d5d00]" : "bg-black/5 text-black/50"
-                          )}
-                        >
-                          <span>{language === "tr" ? "Tarihi belgede göster" : "Show date on document"}</span>
-                          <span className={cn("rounded-full px-2 py-1", invoiceData.showDueDate ? "bg-white/70" : "bg-white")}>{invoiceData.showDueDate ? (language === "tr" ? "Açık" : "On") : (language === "tr" ? "Kapalı" : "Off")}</span>
-                        </button>
-                        <div className="mt-3 rounded-xl border border-black/8 bg-white p-1">
-                          <Calendar
-                            mode="single"
-                            selected={parseTrDate(invoiceData.dueDate || getFutureDate(1))}
-                            onSelect={(date) => {
-                              if (date) {
-                                setInvoiceData({ ...invoiceData, showDueDate: true, dueDate: format(date, "dd.MM.yyyy") });
-                              }
-                            }}
-                            initialFocus
-                            locale={language === "en" ? enUS : tr}
-                          />
-                        </div>
-                        <DockPopoverFooter language={language} />
-                      </PopoverContent>
-                    </Popover>
                   </div>
                 </div>
 
@@ -2137,39 +2272,29 @@ export default function AppPage() {
                   <span className="px-1.5 text-[8.5px] font-bold uppercase tracking-[0.14em] text-black/35">
                     {language === "tr" ? "Dil ve para birimi" : "Language & currency"}
                   </span>
-                  <div className="grid grid-cols-2 gap-2 rounded-xl border border-black/8 bg-white/55 p-2">
-                    <div className="min-w-0 space-y-1">
-                      <span className="block px-1 text-[8px] font-semibold text-black/38">
-                        {language === "tr" ? "Dil" : "Language"}
-                      </span>
-                      <Select value={language} onValueChange={(val: Language) => setLanguage(val)}>
-                        <SelectTrigger aria-label={t.languageLabel} className="h-9 w-full min-w-0 rounded-lg border-black/8 bg-white px-2.5 text-[10.5px] font-semibold shadow-none focus:ring-0 cursor-pointer">
-                          <span className="whitespace-nowrap">{language === "tr" ? "🇹🇷 TR" : "🇬🇧 EN"}</span>
-                        </SelectTrigger>
-                        <SelectContent align="start">
-                          <SelectItem value="tr">🇹🇷 Türkçe</SelectItem>
-                          <SelectItem value="en">🇬🇧 English</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={language} onValueChange={(val: Language) => setLanguage(val)}>
+                      <SelectTrigger aria-label={t.languageLabel} className="h-10 w-full min-w-0 rounded-xl border-black/10 bg-white px-3 text-[11px] font-semibold shadow-xs focus:ring-0 cursor-pointer hover:border-black/22">
+                        <span className="whitespace-nowrap">{language === "tr" ? "🇹🇷 TR" : "🇬🇧 EN"}</span>
+                      </SelectTrigger>
+                      <SelectContent align="start">
+                        <SelectItem value="tr">🇹🇷 Türkçe</SelectItem>
+                        <SelectItem value="en">🇬🇧 English</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                    <div className="min-w-0 space-y-1">
-                      <span className="block px-1 text-[8px] font-semibold text-black/38">
-                        {language === "tr" ? "Para birimi" : "Currency"}
-                      </span>
-                      <Select value={currency} onValueChange={(val: Currency) => setCurrency(val)}>
-                        <SelectTrigger aria-label={t.currencyLabel} className="h-9 w-full min-w-0 rounded-lg border-black/8 bg-white px-2.5 font-geist text-[10.5px] font-semibold shadow-none focus:ring-0 cursor-pointer">
-                          <span className="whitespace-nowrap">{CURRENCIES[currency]?.symbol} {currency}</span>
-                        </SelectTrigger>
-                        <SelectContent align="end">
-                          {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {CURRENCIES[c].symbol} {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <Select value={currency} onValueChange={(val: Currency) => setCurrency(val)}>
+                      <SelectTrigger aria-label={t.currencyLabel} className="h-10 w-full min-w-0 rounded-xl border-black/10 bg-white px-3 font-geist text-[11px] font-semibold shadow-xs focus:ring-0 cursor-pointer hover:border-black/22">
+                        <span className="whitespace-nowrap">{CURRENCIES[currency]?.symbol} {currency}</span>
+                      </SelectTrigger>
+                      <SelectContent align="end">
+                        {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {CURRENCIES[c].symbol} {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

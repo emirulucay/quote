@@ -1,11 +1,23 @@
-import { useState, useEffect } from "react";
-import { Profile, LineItem, SavedService, InvoiceData, CustomTax, ServicesLayout } from "../types";
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Profile,
+  LineItem,
+  SavedService,
+  SavedClient,
+  SavedQuote,
+  InvoiceData,
+  CustomTax,
+  ServicesLayout,
+} from "../types";
 import { Language, Currency, TRANSLATIONS } from "../lib/i18n";
+import { STORAGE_KEYS, safeGetItem, safeGetJSON, safeSetJSON } from "../lib/storage";
 import { toast } from "sonner";
 
 export const DEFAULT_COMPANY_LOGO = "";
 export const DEFAULT_CLIENT_LOGO = "https://images.pexels.com/photos/19023561/pexels-photo-19023561.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
 const LEGACY_DEFAULT_NOTE = "Bizi tercih ettiğiniz için teşekkür ederiz.";
+const MAX_HISTORY_ENTRIES = 5;
+const MAX_SAVED_CLIENTS = 40;
 const DOCUMENT_TITLE_TRANSLATIONS: Record<Language, Record<string, string>> = {
   tr: {
     "SERVICE SUMMARY": "HİZMET ÖZETİ",
@@ -42,6 +54,39 @@ const getFutureDate = (monthsToAdd = 12) => {
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 };
 
+const SESSION_DRAFT_KEY = "quote-session-draft";
+const SESSION_LINE_ITEMS_KEY = "quote-session-line-items";
+
+const readSessionDraft = (): Partial<InvoiceData> | null => {
+  try {
+    const raw = sessionStorage.getItem(SESSION_DRAFT_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? (parsed as Partial<InvoiceData>) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeSessionDraft = (draft: Partial<InvoiceData>) => {
+  try {
+    sessionStorage.setItem(SESSION_DRAFT_KEY, JSON.stringify(draft));
+  } catch (e) {
+    console.error("Failed to save session draft", e);
+  }
+};
+
+/**
+ * Reserves the next quote number and persists the counter immediately, so two
+ * quotes can never share a number. Restarts at 001 each calendar year.
+ */
+const mintQuoteNumber = (): string => {
+  const year = new Date().getFullYear();
+  const counter = safeGetJSON<{ year: number; seq: number }>(STORAGE_KEYS.numberCounter, { year: 0, seq: 0 });
+  const seq = counter.year === year ? (Number(counter.seq) || 0) + 1 : 1;
+  safeSetJSON(STORAGE_KEYS.numberCounter, { year, seq });
+  return `${year}-${String(seq).padStart(3, "0")}`;
+};
+
 const emptyInvoiceData: InvoiceData = {
   title: "",
   clientName: "Ahmet Yılmaz",
@@ -62,10 +107,6 @@ const emptyInvoiceData: InvoiceData = {
   accountHolder: "",
   showDiscount: false,
   discountRate: 0,
-  showSignature: false,
-  signatureTitle: "",
-  showDueDate: false,
-  dueDate: getFutureDate(1),
   pdfFont: "plex",
   pdfLayout: "modern",
 };
@@ -82,31 +123,55 @@ export function useInvoiceState() {
   const [hasChosenServicesLayout, setHasChosenServicesLayout] = useState<boolean>(false);
   const [customTaxes, setCustomTaxes] = useState<CustomTax[]>([]);
   const [savedServices, setSavedServices] = useState<SavedService[]>([]);
+  const [savedClients, setSavedClients] = useState<SavedClient[]>([]);
+  const [quoteHistory, setQuoteHistory] = useState<SavedQuote[]>([]);
+
+  // Kept in a ref so `persist` stays referentially stable across renders.
+  const languageRef = useRef<Language>("tr");
+  const quotaWarnedRef = useRef(false);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
+
+  /**
+   * Persists to localStorage and surfaces a quota failure once per session.
+   * Without this, a full store silently drops every subsequent write.
+   */
+  const persist = useCallback((key: string, value: unknown) => {
+    const result = safeSetJSON(key, value);
+    if (!result.ok && result.quotaExceeded && !quotaWarnedRef.current) {
+      quotaWarnedRef.current = true;
+      toast.error(
+        languageRef.current === "tr"
+          ? "Tarayıcı depolama alanı doldu. Yeni kayıtlar saklanamıyor — geçmişten eski teklifleri silin."
+          : "Browser storage is full. New data can't be saved — delete old quotes from history."
+      );
+    }
+    return result;
+  }, []);
 
   useEffect(() => {
     // Load preferences
     let layoutFromPrefs: ServicesLayout | null = null;
-    let loadedLang: Language = "tr";
-    const savedPrefs = localStorage.getItem("quote-preferences");
+    const savedPrefs = safeGetJSON<{ language?: string; currency?: string; servicesLayout?: string } | null>(
+      STORAGE_KEYS.preferences,
+      null
+    );
     if (savedPrefs) {
-      try {
-        const parsed = JSON.parse(savedPrefs);
-        if (parsed.language && (parsed.language === "tr" || parsed.language === "en")) {
-          setLanguageState(parsed.language);
-          loadedLang = parsed.language;
-        }
-        if (parsed.currency && ["TRY", "USD", "EUR", "GBP"].includes(parsed.currency)) {
-          setCurrencyState(parsed.currency);
-        }
-        if (parsed.servicesLayout === "inline" || parsed.servicesLayout === "tabs") {
-          layoutFromPrefs = parsed.servicesLayout;
-        }
-      } catch (e) {
-        console.error("Failed to parse preferences", e);
+      if (savedPrefs.language === "tr" || savedPrefs.language === "en") {
+        setLanguageState(savedPrefs.language);
+        languageRef.current = savedPrefs.language;
+      }
+      if (savedPrefs.currency && ["TRY", "USD", "EUR", "GBP"].includes(savedPrefs.currency)) {
+        setCurrencyState(savedPrefs.currency as Currency);
+      }
+      if (savedPrefs.servicesLayout === "inline" || savedPrefs.servicesLayout === "tabs") {
+        layoutFromPrefs = savedPrefs.servicesLayout;
       }
     }
 
-    const savedLayout = localStorage.getItem("quote-services-layout");
+    const savedLayout = safeGetItem(STORAGE_KEYS.servicesLayout);
     if (savedLayout === "inline" || savedLayout === "tabs") {
       layoutFromPrefs = savedLayout;
     }
@@ -119,102 +184,71 @@ export function useInvoiceState() {
     }
 
     // Load custom taxes
-    const savedCustomTaxes = localStorage.getItem("quote-custom-taxes");
-    if (savedCustomTaxes) {
-      try {
-        const parsed = JSON.parse(savedCustomTaxes);
-        if (Array.isArray(parsed)) {
-          setCustomTaxes(parsed);
-        }
-      } catch (e) {
-        console.error("Failed to parse custom taxes", e);
-      }
+    const savedCustomTaxes = safeGetJSON<CustomTax[]>(STORAGE_KEYS.customTaxes, []);
+    if (Array.isArray(savedCustomTaxes)) setCustomTaxes(savedCustomTaxes);
+
+    // Assemble the invoice from persistent preferences + this tab's draft.
+    let nextInvoiceData: InvoiceData = { ...emptyInvoiceData };
+
+    const creationPrefs = safeGetJSON<Partial<InvoiceData> | null>(STORAGE_KEYS.creationPreferences, null);
+    if (creationPrefs && typeof creationPrefs === "object") {
+      nextInvoiceData = {
+        ...nextInvoiceData,
+        ...creationPrefs,
+        notes: creationPrefs.notes === LEGACY_DEFAULT_NOTE ? "" : (creationPrefs.notes ?? nextInvoiceData.notes),
+      };
     }
 
-    // Load persistent quote creation preferences from localStorage
-    const savedCreationPrefs = localStorage.getItem("quote-creation-preferences");
-    if (savedCreationPrefs) {
-      try {
-        const parsed = JSON.parse(savedCreationPrefs);
-        if (parsed && typeof parsed === "object") {
-          setInvoiceData((prev) => ({
-            ...prev,
-            ...parsed,
-            notes: parsed.notes === LEGACY_DEFAULT_NOTE ? "" : (parsed.notes ?? prev.notes),
-          }));
-        }
-      } catch (e) {
-        console.error("Failed to parse creation preferences", e);
-      }
+    const sessionDraft = readSessionDraft();
+    if (sessionDraft) {
+      nextInvoiceData = { ...nextInvoiceData, ...sessionDraft };
     }
+
+    setInvoiceData(nextInvoiceData);
 
     // Load in-progress / draft services from sessionStorage
-    const sessionLineItems = sessionStorage.getItem("quote-session-line-items");
-    if (sessionLineItems) {
-      try {
+    try {
+      const sessionLineItems = sessionStorage.getItem(SESSION_LINE_ITEMS_KEY);
+      if (sessionLineItems) {
         const parsed = JSON.parse(sessionLineItems);
-        if (Array.isArray(parsed)) {
-          setLineItems(parsed);
-        }
-      } catch (e) {
-        console.error("Failed to parse session line items", e);
+        if (Array.isArray(parsed)) setLineItems(parsed);
       }
-    }
-
-    // Load active session draft metadata (e.g. clientName / date override) if in sessionStorage
-    const sessionDraft = sessionStorage.getItem("quote-session-draft");
-    if (sessionDraft) {
-      try {
-        const parsed = JSON.parse(sessionDraft);
-        if (parsed && typeof parsed === "object") {
-          setInvoiceData((prev) => ({
-            ...prev,
-            ...parsed,
-          }));
-        }
-      } catch (e) {
-        console.error("Failed to parse session draft", e);
-      }
+    } catch (e) {
+      console.error("Failed to parse session line items", e);
     }
 
     // Load saved services (strictly user-saved services only)
-    const savedServicesRaw = localStorage.getItem("quote-saved-services");
-    if (savedServicesRaw) {
-      try {
-        const parsed = JSON.parse(savedServicesRaw);
-        if (Array.isArray(parsed)) {
-          const userOnly = parsed.filter((s) => s.id && !s.id.startsWith("preset-"));
-          setSavedServices(userOnly);
-        } else {
-          setSavedServices([]);
-        }
-      } catch (e) {
-        console.error("Failed to parse saved services", e);
-        setSavedServices([]);
-      }
-    } else {
-      setSavedServices([]);
-    }
+    const parsedServices = safeGetJSON<SavedService[]>(STORAGE_KEYS.savedServices, []);
+    setSavedServices(
+      Array.isArray(parsedServices)
+        ? parsedServices.filter((s) => s.id && !s.id.startsWith("preset-"))
+        : []
+    );
+
+    // Load saved clients & quote history
+    const parsedClients = safeGetJSON<SavedClient[]>(STORAGE_KEYS.savedClients, []);
+    setSavedClients(Array.isArray(parsedClients) ? parsedClients.filter((c) => c.id && c.name) : []);
+
+    const parsedHistory = safeGetJSON<SavedQuote[]>(STORAGE_KEYS.history, []);
+    setQuoteHistory(
+      Array.isArray(parsedHistory)
+        ? parsedHistory.filter((q) => q && q.id && Array.isArray(q.lineItems) && q.invoiceData)
+        : []
+    );
 
     // Load profiles
-    const savedProfiles = localStorage.getItem("invoice-profiles");
-    const savedActiveProfileId = localStorage.getItem("quote-active-profile-id");
-    if (savedProfiles) {
-      try {
-        const parsed = JSON.parse(savedProfiles);
-        const validProfiles = Array.isArray(parsed) ? parsed.filter((p) => p.id !== "default") : [];
-        if (validProfiles.length > 0) {
-          setProfiles(validProfiles);
-          const found = validProfiles.some((p) => p.id === savedActiveProfileId);
-          setActiveProfileId(found && savedActiveProfileId ? savedActiveProfileId : validProfiles[0].id);
-        } else {
-          setProfiles([]);
-          setActiveProfileId("");
-        }
-      } catch (e) {
-        console.error("Failed to parse profiles", e);
-      }
+    const parsed = safeGetJSON<Profile[]>(STORAGE_KEYS.profiles, []);
+    const savedActiveProfileId = safeGetItem(STORAGE_KEYS.activeProfileId);
+    const validProfiles = Array.isArray(parsed) ? parsed.filter((p) => p.id !== "default") : [];
+    if (validProfiles.length > 0) {
+      setProfiles(validProfiles);
+      const found = validProfiles.some((p) => p.id === savedActiveProfileId);
+      setActiveProfileId(found && savedActiveProfileId ? savedActiveProfileId : validProfiles[0].id);
+    } else {
+      setProfiles([]);
+      setActiveProfileId("");
     }
+
     setIsLoaded(true);
   }, []);
 
@@ -239,60 +273,63 @@ export function useInvoiceState() {
         accountHolder: invoiceData.accountHolder,
         showDiscount: invoiceData.showDiscount,
         discountRate: invoiceData.discountRate,
-        showSignature: invoiceData.showSignature,
-        signatureTitle: invoiceData.signatureTitle,
-        showDueDate: invoiceData.showDueDate,
       };
-      localStorage.setItem("quote-creation-preferences", JSON.stringify(persistentPreferences));
+      persist(STORAGE_KEYS.creationPreferences, persistentPreferences);
 
       // Save in-progress session draft (client info, specific dates) in sessionStorage
-      const sessionDraft = {
+      writeSessionDraft({
         clientName: invoiceData.clientName,
         date: invoiceData.date,
-        dueDate: invoiceData.dueDate,
         periodStart: invoiceData.periodStart,
         periodEnd: invoiceData.periodEnd,
-      };
-      sessionStorage.setItem("quote-session-draft", JSON.stringify(sessionDraft));
+      });
     }
-  }, [invoiceData, isLoaded]);
+  }, [invoiceData, isLoaded, persist]);
 
   // Save in-progress / draft services in sessionStorage
   useEffect(() => {
     if (isLoaded) {
-      sessionStorage.setItem("quote-session-line-items", JSON.stringify(lineItems));
+      try {
+        sessionStorage.setItem(SESSION_LINE_ITEMS_KEY, JSON.stringify(lineItems));
+      } catch (e) {
+        console.error("Failed to save session line items", e);
+      }
     }
   }, [lineItems, isLoaded]);
 
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem("invoice-profiles", JSON.stringify(profiles));
+      persist(STORAGE_KEYS.profiles, profiles);
       if (activeProfileId) {
-        localStorage.setItem("quote-active-profile-id", activeProfileId);
+        persist(STORAGE_KEYS.activeProfileId, activeProfileId);
       }
     }
-  }, [profiles, activeProfileId, isLoaded]);
+  }, [profiles, activeProfileId, isLoaded, persist]);
 
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem("quote-preferences", JSON.stringify({ language, currency, servicesLayout }));
+      persist(STORAGE_KEYS.preferences, { language, currency, servicesLayout });
       if (hasChosenServicesLayout) {
-        localStorage.setItem("quote-services-layout", servicesLayout);
+        persist(STORAGE_KEYS.servicesLayout, servicesLayout);
       }
     }
-  }, [language, currency, servicesLayout, hasChosenServicesLayout, isLoaded]);
+  }, [language, currency, servicesLayout, hasChosenServicesLayout, isLoaded, persist]);
 
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem("quote-custom-taxes", JSON.stringify(customTaxes));
-    }
-  }, [customTaxes, isLoaded]);
+    if (isLoaded) persist(STORAGE_KEYS.customTaxes, customTaxes);
+  }, [customTaxes, isLoaded, persist]);
 
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem("quote-saved-services", JSON.stringify(savedServices));
-    }
-  }, [savedServices, isLoaded]);
+    if (isLoaded) persist(STORAGE_KEYS.savedServices, savedServices);
+  }, [savedServices, isLoaded, persist]);
+
+  useEffect(() => {
+    if (isLoaded) persist(STORAGE_KEYS.savedClients, savedClients);
+  }, [savedClients, isLoaded, persist]);
+
+  useEffect(() => {
+    if (isLoaded) persist(STORAGE_KEYS.history, quoteHistory);
+  }, [quoteHistory, isLoaded, persist]);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
@@ -313,7 +350,7 @@ export function useInvoiceState() {
   const setServicesLayout = (layout: ServicesLayout) => {
     setServicesLayoutState(layout);
     setHasChosenServicesLayout(true);
-    localStorage.setItem("quote-services-layout", layout);
+    persist(STORAGE_KEYS.servicesLayout, layout);
   };
 
   const addCustomTax = (name: string, rate: number) => {
@@ -329,7 +366,7 @@ export function useInvoiceState() {
   const saveOrUpdateServices = (itemsToSave: LineItem[], targetCurrency?: Currency) => {
     const curr = targetCurrency || currency;
     setSavedServices((prev) => {
-      let next = [...prev];
+      const next = [...prev];
       for (const item of itemsToSave) {
         const name = item.name.trim();
         const priceNum = Number(item.price);
@@ -367,6 +404,96 @@ export function useInvoiceState() {
 
   const deleteSavedService = (id: string) => {
     setSavedServices((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  /** Remembers a client name so it can be offered as a suggestion next time. */
+  const saveClient = (rawName: string) => {
+    const name = rawName.trim();
+    if (!name) return;
+    setSavedClients((prev) => {
+      const next = [...prev];
+      const existingIndex = next.findIndex((c) => c.name.trim().toLowerCase() === name.toLowerCase());
+      if (existingIndex >= 0) {
+        next[existingIndex] = {
+          ...next[existingIndex],
+          name,
+          usageCount: (next[existingIndex].usageCount || 0) + 1,
+          lastUsedAt: Date.now(),
+        };
+      } else {
+        next.unshift({
+          id: `client-${crypto.randomUUID()}`,
+          name,
+          usageCount: 1,
+          lastUsedAt: Date.now(),
+        });
+      }
+      return next
+        .sort((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0))
+        .slice(0, MAX_SAVED_CLIENTS);
+    });
+  };
+
+  const deleteSavedClient = (id: string) => {
+    setSavedClients((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  /**
+   * Archives the current quote. Each export is its own entry, so only the last
+   * MAX_HISTORY_ENTRIES downloads are kept.
+   */
+  const saveQuoteToHistory = (total: number) => {
+    const quoteNumber = mintQuoteNumber();
+    const entry: SavedQuote = {
+      id: `quote-${crypto.randomUUID()}`,
+      quoteNumber,
+      clientName: invoiceData.clientName?.trim() || "",
+      title: invoiceData.title,
+      date: invoiceData.date,
+      total,
+      currency,
+      language,
+      profileId: activeProfileId,
+      itemCount: lineItems.length,
+      savedAt: Date.now(),
+      invoiceData: { ...invoiceData },
+      lineItems: lineItems.map((item) => ({ ...item })),
+    };
+
+    setQuoteHistory((prev) => [entry, ...prev].slice(0, MAX_HISTORY_ENTRIES));
+
+    return entry;
+  };
+
+  const deleteQuoteFromHistory = (id: string) => {
+    setQuoteHistory((prev) => prev.filter((q) => q.id !== id));
+  };
+
+  const clearQuoteHistory = () => {
+    setQuoteHistory([]);
+  };
+
+  /** Reopens an archived quote, restoring its items, currency and profile. */
+  const loadQuoteFromHistory = (quote: SavedQuote) => {
+    setInvoiceData({ ...emptyInvoiceData, ...quote.invoiceData });
+    setLineItems(quote.lineItems.map((item) => ({ ...item })));
+    if (quote.currency) setCurrencyState(quote.currency);
+    if (quote.language) setLanguageState(quote.language);
+    if (quote.profileId && profiles.some((p) => p.id === quote.profileId)) {
+      setActiveProfileId(quote.profileId);
+    }
+  };
+
+  /** Clears the working quote; profile and document settings are kept. */
+  const startNewQuote = () => {
+    setLineItems([]);
+    setInvoiceData((prev) => ({
+      ...prev,
+      clientName: "",
+      date: getInitialDate(),
+      periodStart: getInitialDate(),
+      periodEnd: getFutureDate(12),
+    }));
   };
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId) || profiles[0] || null;
@@ -443,6 +570,15 @@ export function useInvoiceState() {
     savedServices,
     saveOrUpdateServices,
     deleteSavedService,
+    savedClients,
+    saveClient,
+    deleteSavedClient,
+    quoteHistory,
+    saveQuoteToHistory,
+    deleteQuoteFromHistory,
+    clearQuoteHistory,
+    loadQuoteFromHistory,
+    startNewQuote,
     t,
   };
 }

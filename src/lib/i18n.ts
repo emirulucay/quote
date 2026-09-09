@@ -161,8 +161,6 @@ export const TRANSLATIONS = {
     moduleNotes: "Notlar",
     modulePaymentInfo: "Banka / IBAN",
     moduleDiscount: "İndirim",
-    moduleSignature: "İmza Alanı",
-    moduleDueDate: "Vade Tarihi",
     
     // Module Fields & Placeholders
     paymentInfoTitle: "BANKA & ÖDEME BİLGİLERİ",
@@ -177,15 +175,6 @@ export const TRANSLATIONS = {
     discountPlaceholder: "Örn: 10",
     discountBadgeLabel: "İndirim",
     discountAmountLabel: "İndirim",
-    
-    signatureBoxTitle: "ONAY & İMZA",
-    signatureTitleLabel: "İmzalayan Ünvanı",
-    signatureTitlePlaceholder: "Örn: Yetkili İmza / Kaşe",
-    signatureLineText: "Yetkili İmza / Kaşe",
-    
-    dueDateLabel: "Son Geçerlilik / Vade",
-    dueDateBadgeLabel: "Vade / Geçerlilik",
-    dueDatePrefix: "Son Geçerlilik",
 
     // Font Options
     fontSelectorLabel: "Yazı Tipi",
@@ -215,6 +204,32 @@ export const TRANSLATIONS = {
     layoutCreativeSub: "Sol Şerit & Asimetrik",
     layoutDark: "Dark Mode (Obsidyen)",
     layoutDarkSub: "Koyu Zemin & Yüksek Kontrast",
+
+    // Quote History
+    historyTitle: "Teklif Geçmişi",
+    historyDesc: "İndirdiğiniz teklifler bu tarayıcıda saklanır.",
+    historyButton: "Geçmiş",
+    historyEmptyTitle: "Henüz kayıtlı teklif yok",
+    historyEmptyDesc: "PDF indirdiğinizde teklif otomatik olarak buraya kaydedilir.",
+    historyOpenAction: "Aç",
+    historyDeleteAction: "Sil",
+    historyClearAction: "Tümünü sil",
+    historyLoadedToast: "Teklif yüklendi",
+    historyDeletedToast: "Teklif geçmişten silindi",
+    historyClearedToast: "Teklif geçmişi temizlendi",
+    historyItemsLabel: "kalem",
+    newQuoteButton: "Yeni Teklif",
+    newQuoteToast: "Yeni teklif başlatıldı",
+    newQuoteConfirm: "Üzerinde çalıştığınız teklif temizlenecek. Devam edilsin mi?",
+
+    // Client Suggestions
+    savedClientsTitle: "Kayıtlı Müşteriler",
+    removeFromClients: "Müşteriyi kaldır",
+    clientAppliedToast: "Müşteri seçildi",
+    savedClientRemovedToast: "Müşteri kayıtlardan kaldırıldı",
+
+    // Storage
+    storageUsageLabel: "Kullanılan alan",
   },
   en: {
     // Onboarding
@@ -361,8 +376,6 @@ export const TRANSLATIONS = {
     moduleNotes: "Notes",
     modulePaymentInfo: "Bank / IBAN",
     moduleDiscount: "Discount",
-    moduleSignature: "Signature Area",
-    moduleDueDate: "Due Date",
     
     // Module Fields & Placeholders
     paymentInfoTitle: "BANK & PAYMENT DETAILS",
@@ -377,15 +390,6 @@ export const TRANSLATIONS = {
     discountPlaceholder: "e.g. 10",
     discountBadgeLabel: "Discount",
     discountAmountLabel: "Discount",
-    
-    signatureBoxTitle: "APPROVAL & SIGNATURE",
-    signatureTitleLabel: "Signer Title",
-    signatureTitlePlaceholder: "e.g. Authorized Signatory",
-    signatureLineText: "Authorized Signature",
-    
-    dueDateLabel: "Due Date / Validity",
-    dueDateBadgeLabel: "Due Date",
-    dueDatePrefix: "Valid Until",
 
     // Font Options
     fontSelectorLabel: "Typography",
@@ -415,5 +419,31 @@ export const TRANSLATIONS = {
     layoutCreativeSub: "Left Accent & Asymmetric",
     layoutDark: "Dark Mode (Obsidian)",
     layoutDarkSub: "Deep Dark Theme",
+
+    // Quote History
+    historyTitle: "Quote History",
+    historyDesc: "Quotes you download are kept in this browser.",
+    historyButton: "History",
+    historyEmptyTitle: "No saved quotes yet",
+    historyEmptyDesc: "Your quote is saved here automatically when you download the PDF.",
+    historyOpenAction: "Open",
+    historyDeleteAction: "Delete",
+    historyClearAction: "Delete all",
+    historyLoadedToast: "Quote loaded",
+    historyDeletedToast: "Quote removed from history",
+    historyClearedToast: "Quote history cleared",
+    historyItemsLabel: "items",
+    newQuoteButton: "New Quote",
+    newQuoteToast: "Started a new quote",
+    newQuoteConfirm: "The quote you are working on will be cleared. Continue?",
+
+    // Client Suggestions
+    savedClientsTitle: "Saved Clients",
+    removeFromClients: "Remove client",
+    clientAppliedToast: "Client selected",
+    savedClientRemovedToast: "Client removed from saved list",
+
+    // Storage
+    storageUsageLabel: "Storage used",
   },
 };
