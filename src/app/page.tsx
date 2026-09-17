@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import { QuoteLogo } from "@/components/quote-logo";
+import { FlagGB } from "@/components/flag-icons";
 
 const GithubIcon = ({ className = "size-4" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
@@ -107,7 +108,7 @@ export default function LandingPage() {
                   <div className="flex flex-col border-b border-black/8 bg-[#fbfaf7] p-5 lg:border-b-0 lg:border-r sm:p-6">
                     <div className="flex items-start justify-between border-b border-black/8 pb-4">
                       <div><QuoteLogo className="h-4 w-auto" /><p className="mt-2 text-[7px] font-semibold tracking-[0.14em] text-black/32">NEW QUOTE</p></div>
-                      <div className="flex gap-1.5"><span className="rounded-full border border-black/8 bg-white px-2 py-1 text-[8px] font-medium">🇬🇧 EN</span><span className="rounded-full border border-black/8 bg-white px-2 py-1 text-[8px] font-medium">€ EUR</span></div>
+                      <div className="flex gap-1.5"><span className="inline-flex items-center gap-1 rounded-full border border-black/8 bg-white px-2 py-1 text-[8px] font-medium"><FlagGB className="h-2 w-[11px] shrink-0 rounded-[1px] ring-1 ring-black/10" />EN</span><span className="rounded-full border border-black/8 bg-white px-2 py-1 text-[8px] font-medium">€ EUR</span></div>
                     </div>
                     <div className="mt-4 flex items-center justify-between rounded-lg border border-black/8 bg-white px-3 py-2 text-[9px] font-medium"><span>Emir Uluçay</span><span className="text-black/30">⌄</span></div>
                     <div className="mt-5 flex items-center gap-2"><span className="flex size-5 items-center justify-center rounded-full bg-[#dff568] font-mono text-[7px] font-bold">01</span><p className="text-[10px] font-semibold">Invoice details</p></div>

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRef, useState, useEffect, ChangeEvent } from "react";
 import { QuoteLogo } from "@/components/quote-logo";
+import { FlagGB, FlagTR, LanguageFlag } from "@/components/flag-icons";
 import { useInvoiceState } from "@/hooks/use-invoice-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -598,9 +599,9 @@ export default function AppPage() {
                       <fieldset>
                         <legend lang="en" className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42"><Globe className="size-3.5" />{t.languageLabel}</legend>
                         <div className="grid grid-cols-2 gap-3">
-                          {[{ code: "tr" as const, flag: "🇹🇷", label: "Türkçe" }, { code: "en" as const, flag: "🇬🇧", label: "English" }].map((option) => {
+                          {[{ code: "tr" as const, label: "Türkçe" }, { code: "en" as const, label: "English" }].map((option) => {
                             const selected = language === option.code;
-                            return <button key={option.code} type="button" onClick={() => setLanguage(option.code)} className={cn("group flex min-h-20 items-center gap-3 rounded-2xl border p-4 text-left transition-all sm:px-5 cursor-pointer", selected ? "border-[#171815] bg-white shadow-[0_7px_20px_rgba(20,21,18,0.07)] ring-1 ring-[#171815]" : "border-black/9 bg-white/45 text-black/48 hover:border-black/25 hover:bg-white")}><span className="text-xl">{option.flag}</span><span className="text-sm font-semibold sm:text-base">{option.label}</span><span className={cn("ml-auto flex size-6 items-center justify-center rounded-full transition-colors", selected ? "bg-[#dff568] text-black" : "border border-black/10 text-transparent")}><Check className="size-3.5" /></span></button>;
+                            return <button key={option.code} type="button" onClick={() => setLanguage(option.code)} className={cn("group flex min-h-20 items-center gap-3 rounded-2xl border p-4 text-left transition-all sm:px-5 cursor-pointer", selected ? "border-[#171815] bg-white shadow-[0_7px_20px_rgba(20,21,18,0.07)] ring-1 ring-[#171815]" : "border-black/9 bg-white/45 text-black/48 hover:border-black/25 hover:bg-white")}><LanguageFlag language={option.code} className="h-5 w-7 shrink-0 rounded-[3px] ring-1 ring-black/10" /><span className="text-sm font-semibold sm:text-base">{option.label}</span><span className={cn("ml-auto flex size-6 items-center justify-center rounded-full transition-colors", selected ? "bg-[#dff568] text-black" : "border border-black/10 text-transparent")}><Check className="size-3.5" /></span></button>;
                           })}
                         </div>
                       </fieldset>
@@ -2275,11 +2276,11 @@ export default function AppPage() {
                   <div className="grid grid-cols-2 gap-2">
                     <Select value={language} onValueChange={(val: Language) => setLanguage(val)}>
                       <SelectTrigger aria-label={t.languageLabel} className="h-10 w-full min-w-0 rounded-xl border-black/10 bg-white px-3 text-[11px] font-semibold shadow-xs focus:ring-0 cursor-pointer hover:border-black/22">
-                        <span className="whitespace-nowrap">{language === "tr" ? "🇹🇷 TR" : "🇬🇧 EN"}</span>
+                        <span className="flex items-center gap-1.5 whitespace-nowrap"><LanguageFlag language={language} className="h-3 w-4 shrink-0 rounded-[2px] ring-1 ring-black/10" />{language === "tr" ? "TR" : "EN"}</span>
                       </SelectTrigger>
                       <SelectContent align="start">
-                        <SelectItem value="tr">🇹🇷 Türkçe</SelectItem>
-                        <SelectItem value="en">🇬🇧 English</SelectItem>
+                        <SelectItem value="tr"><span className="flex items-center gap-1.5"><FlagTR className="h-3 w-4 shrink-0 rounded-[2px] ring-1 ring-black/10" />Türkçe</span></SelectItem>
+                        <SelectItem value="en"><span className="flex items-center gap-1.5"><FlagGB className="h-3 w-4 shrink-0 rounded-[2px] ring-1 ring-black/10" />English</span></SelectItem>
                       </SelectContent>
                     </Select>
 
