@@ -5,48 +5,49 @@ import { Toaster } from "sonner";
 import "./globals.css";
 
 const geist = Geist({
-  variable: "--font-geist",
+  variable: "--font-geist-face",
   subsets: ["latin", "latin-ext"],
 });
 
 const plexSans = IBM_Plex_Sans({
-  variable: "--font-plex",
+  variable: "--font-plex-face",
   subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
+  variable: "--font-mono-face",
   subsets: ["latin", "latin-ext"],
 });
 
 const inter = Inter({
-  variable: "--font-inter",
+  variable: "--font-inter-face",
   subsets: ["latin", "latin-ext"],
 });
 
 const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
+  variable: "--font-jakarta-face",
   subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600", "700"],
 });
 
 const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space",
+  variable: "--font-space-face",
   subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600", "700"],
 });
 
 const playfair = Playfair_Display({
-  variable: "--font-playfair",
+  variable: "--font-playfair-face",
   subsets: ["latin", "latin-ext"],
   weight: ["400", "600", "700"],
 });
 
 const lora = Lora({
-  variable: "--font-lora",
+  variable: "--font-lora-face",
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
+  // 700 is here for Playfair Display, which borrows Lora's ₺ at bold weights.
+  weight: ["400", "500", "600", "700"],
 });
 
 const jsonLd = {
@@ -142,16 +143,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr">
+    // The --font-*-face variables live on <html> so the font stacks in globals.css,
+    // which are declared on :root, can resolve them. Declared on <body> they would
+    // be out of scope and the whole stack would compute to invalid.
+    <html
+      lang="tr"
+      className={`${geist.variable} ${plexSans.variable} ${jetbrainsMono.variable} ${inter.variable} ${jakarta.variable} ${spaceGrotesk.variable} ${playfair.variable} ${lora.variable}`}
+    >
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body
-        className={`${plexSans.className} ${geist.variable} ${plexSans.variable} ${jetbrainsMono.variable} ${inter.variable} ${jakarta.variable} ${spaceGrotesk.variable} ${playfair.variable} ${lora.variable} antialiased`}
-      >
+      <body className={`${plexSans.className} antialiased`}>
         {children}
         <Toaster position="bottom-right" />
         <Analytics />

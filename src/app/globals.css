@@ -12,23 +12,34 @@
   --color-border: #E5E5E8;
   --color-danger: #EF4444;
 
-  --font-geist: var(--font-geist), sans-serif;
-  --font-plex: var(--font-plex), sans-serif;
-  --font-mono: var(--font-mono), monospace;
-  --font-inter: var(--font-inter), sans-serif;
-  --font-jakarta: var(--font-jakarta), sans-serif;
-  --font-space: var(--font-space), sans-serif;
-  --font-playfair: var(--font-playfair), serif;
-  --font-lora: var(--font-lora), serif;
+  /*
+   * `--font-*-face` comes from next/font (layout.tsx); the stacks below add the
+   * per-glyph fallbacks.
+   *
+   * Geist, JetBrains Mono and Playfair Display ship no ₺ (U+20BA) glyph at all,
+   * so the browser falls through to a *system* font for that one character.
+   * The system pick differs per OS, and differs again inside the html-to-image
+   * snapshot used for the PDF, which is why ₺ looked wrong on Windows. Inter
+   * (sans) and Lora (serif) both have ₺ and are already loaded, so appending
+   * them keeps the symbol on an embedded webfont everywhere.
+   */
+  --font-geist: var(--font-geist-face), var(--font-inter-face), sans-serif;
+  --font-plex: var(--font-plex-face), sans-serif;
+  --font-mono: var(--font-mono-face), var(--font-inter-face), monospace;
+  --font-inter: var(--font-inter-face), sans-serif;
+  --font-jakarta: var(--font-jakarta-face), sans-serif;
+  --font-space: var(--font-space-face), sans-serif;
+  --font-playfair: var(--font-playfair-face), var(--font-lora-face), serif;
+  --font-lora: var(--font-lora-face), serif;
 }
 
-.font-pdf-plex { font-family: var(--font-plex), sans-serif; }
-.font-pdf-geist { font-family: var(--font-geist), sans-serif; }
-.font-pdf-inter { font-family: var(--font-inter), sans-serif; }
-.font-pdf-jakarta { font-family: var(--font-jakarta), sans-serif; }
-.font-pdf-space { font-family: var(--font-space), sans-serif; }
-.font-pdf-playfair { font-family: var(--font-playfair), serif; }
-.font-pdf-lora { font-family: var(--font-lora), serif; }
+.font-pdf-plex { font-family: var(--font-plex); }
+.font-pdf-geist { font-family: var(--font-geist); }
+.font-pdf-inter { font-family: var(--font-inter); }
+.font-pdf-jakarta { font-family: var(--font-jakarta); }
+.font-pdf-space { font-family: var(--font-space); }
+.font-pdf-playfair { font-family: var(--font-playfair); }
+.font-pdf-lora { font-family: var(--font-lora); }
 
 .preview-workspace {
   background-image:
